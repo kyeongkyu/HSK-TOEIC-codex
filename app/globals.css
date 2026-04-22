@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-source-han-sans: "Source Han Sans SC", "Noto Sans SC", sans-serif;
+  --font-pingfang-sc: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.theme-black {
+  --color-gray-900: #000000;
+  --color-gray-800: #0a0a0a;
+}
+
+html.theme-black .dark\:bg-gray-900 {
+  background-color: #000000 !important;
+}
+html.theme-black .dark\:bg-gray-800 {
+  background-color: #0a0a0a !important;
+}
+html.theme-black .dark\:bg-gray-800\/50 {
+  background-color: rgba(10, 10, 10, 0.5) !important;
+}

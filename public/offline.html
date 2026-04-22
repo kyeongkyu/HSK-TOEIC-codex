@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>HSK/TOEIC Offline</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #ffffff;
+        color: #111827;
+      }
+
+      main {
+        box-sizing: border-box;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+      }
+
+      section {
+        width: 100%;
+        max-width: 420px;
+        text-align: center;
+      }
+
+      .icon {
+        display: inline-flex;
+        width: 64px;
+        height: 64px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e5e7eb;
+        border-radius: 24px;
+        background: #f9fafb;
+        color: #6b7280;
+        font-size: 32px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .eyebrow {
+        margin: 24px 0 8px;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      a {
+        display: inline-flex;
+        height: 48px;
+        align-items: center;
+        justify-content: center;
+        margin-top: 32px;
+        padding: 0 24px;
+        border-radius: 16px;
+        background: #111827;
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #111827;
+          color: #ffffff;
+        }
+
+        .icon {
+          border-color: #374151;
+          background: #1f2937;
+          color: #d1d5db;
+        }
+
+        p {
+          color: #9ca3af;
+        }
+
+        a {
+          background: #ffffff;
+          color: #111827;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <div class="icon" aria-hidden="true">!</div>
+        <p class="eyebrow">Offline</p>
+        <h1>오프라인 상태입니다</h1>
+        <p>
+          이 화면은 아직 기기에 저장되지 않았습니다. 홈과 주요 학습 화면은
+          오프라인에서도 사용할 수 있으며, 세부 화면은 한 번 열어둔 뒤 다시
+          이용할 수 있습니다.
+        </p>
+        <a href="/">홈으로 이동</a>
+      </section>
+    </main>
+  </body>
+</html>
