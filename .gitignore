@@ -7,3 +7,5 @@ scratch/
 *.log
 .env*
 !.env.example
+
+.vercel
