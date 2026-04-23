@@ -8,7 +8,9 @@ type ReviewPanelProps = {
   transcript: string;
   showTranscript: boolean;
   isLast: boolean;
+  canGoPrevious: boolean;
   onToggleTranscript: () => void;
+  onPrevious: () => void;
   onNext: () => void;
 };
 
@@ -18,7 +20,9 @@ export function ReviewPanel({
   transcript,
   showTranscript,
   isLast,
+  canGoPrevious,
   onToggleTranscript,
+  onPrevious,
   onNext,
 }: ReviewPanelProps) {
   return (
@@ -40,13 +44,23 @@ export function ReviewPanel({
           {transcript}
         </div>
       )}
-      <button
-        type="button"
-        onClick={onNext}
-        className="mt-4 w-full rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/20 transition-all active:scale-[0.99] hover:bg-blue-700"
-      >
-        {isLast ? 'View Results' : 'Next Question'}
-      </button>
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={!canGoPrevious}
+          className="flex-1 rounded-2xl bg-white px-4 py-4 text-sm font-black text-gray-700 transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 dark:bg-gray-900 dark:text-gray-100"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          className="flex-1 rounded-2xl bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-xl shadow-blue-500/20 transition-all active:scale-[0.99] hover:bg-blue-700"
+        >
+          {isLast ? 'View Results' : 'Next Question'}
+        </button>
+      </div>
     </div>
   );
 }

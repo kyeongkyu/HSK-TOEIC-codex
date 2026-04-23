@@ -8,6 +8,7 @@ export type LcCategoryCard = {
   label: string;
   description: string;
   count: number;
+  progressPercent?: number;
 };
 
 type LcCategoryGridProps = {
@@ -44,6 +45,24 @@ export function LcCategoryGrid({ items, onSelect }: LcCategoryGridProps) {
               <p className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">
                 {item.count} questions
               </p>
+              {typeof item.progressPercent === 'number' && (
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+                      Progress
+                    </span>
+                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">
+                      {item.progressPercent}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white dark:bg-gray-900/70">
+                    <div
+                      className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
+                      style={{ width: `${item.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="shrink-0 rounded-2xl bg-white p-3 text-gray-400 shadow-sm transition-all group-hover:bg-blue-600 group-hover:text-white dark:bg-white/10">
               <ChevronRight size={18} />

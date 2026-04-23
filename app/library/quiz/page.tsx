@@ -341,24 +341,24 @@ export default function LibraryQuizPage() {
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-full max-w-md bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-[2rem] p-10"
+          className="w-full max-w-md overflow-hidden bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-[2rem] p-8 sm:p-10"
         >
           <div className="w-24 h-24 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-yellow-600/20">
             <Trophy className="text-yellow-600 dark:text-yellow-400" size={48} />
           </div>
           
-          <h1 className="text-4xl font-black text-black dark:text-white mb-2">학습 완료!</h1>
+          <h1 className="text-[clamp(2rem,9vw,3.4rem)] leading-none font-black text-black dark:text-white mb-2">학습 완료!</h1>
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-10">
             Library Quiz • {questions.length} Words
           </p>
           
-          <div className="grid grid-cols-2 gap-4 mb-10">
-            <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-2xl">
-              <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-1">{accuracy}%</div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-10">
+            <div className="min-w-0 p-4 sm:p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-2xl">
+              <div className="min-w-0 text-[clamp(1.9rem,9vw,3rem)] leading-none font-black text-blue-600 dark:text-blue-400 mb-2">{accuracy}%</div>
               <div className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Accuracy</div>
             </div>
-            <div className="p-6 bg-gray-100 dark:bg-gray-800 rounded-2xl">
-              <div className="text-3xl font-black text-black dark:text-white mb-1">{score}/{questions.length}</div>
+            <div className="min-w-0 p-4 sm:p-6 bg-gray-100 dark:bg-gray-800 rounded-2xl">
+              <div className="min-w-0 break-keep text-[clamp(1.7rem,8vw,2.8rem)] leading-none font-black text-black dark:text-white mb-2">{score}/{questions.length}</div>
               <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Correct</div>
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function LibraryQuizPage() {
           <div className="space-y-4">
             <button 
               onClick={handleRestart}
-              className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white w-full py-5 rounded-2xl font-bold active:scale-95 transition-all shadow-lg shadow-blue-600/20"
+              className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white w-full py-5 rounded-2xl font-bold text-base sm:text-lg active:scale-95 transition-all shadow-lg shadow-blue-600/20"
             >
               <RefreshCcw size={20} />
               <span>다시 풀기</span>
@@ -870,4 +870,3 @@ export default function LibraryQuizPage() {
     </div>
   );
 }
-

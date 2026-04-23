@@ -49,6 +49,11 @@ function getDifficultyQuestionCount(difficulty: ToeicPart5Difficulty) {
   return questionCountByDifficulty[difficulty];
 }
 
+function getProgressPercent(currentIndex: number, total: number) {
+  if (total === 0) return 0;
+  return Math.round((Math.min(Math.max(currentIndex, 0), total) / total) * 100);
+}
+
 function normalizeStats(stored: unknown): Part5Stats {
   const parsed = stored && typeof stored === 'object' ? stored as Partial<Record<ToeicPart5Difficulty, Partial<Part5Stats[ToeicPart5Difficulty]>>> : {};
 
@@ -217,6 +222,7 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
           const questionCount = getDifficultyQuestionCount(difficulty);
           const hasSavedProgress = difficultyStats.currentIndex > 0;
           const isExpanded = expandedDifficulty === difficulty;
+          const progressPercent = getProgressPercent(difficultyStats.currentIndex, questionCount);
 
           return (
             <div key={difficulty} className="overflow-hidden rounded-[1.5rem] bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 transform-gpu">
@@ -229,19 +235,31 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
                   <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 leading-relaxed">{meta.description}</p>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase">Correct</span>
-                    <span className="text-lg font-black text-green-600">{difficultyStats.correct}</span>
+                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
+                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Correct</span>
+                    <span className="block min-w-0 leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-green-600">{difficultyStats.correct}</span>
                   </div>
-                  <div className="rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase">Wrong</span>
-                    <span className="text-lg font-black text-red-500">{difficultyStats.wrong}</span>
+                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
+                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Wrong</span>
+                    <span className="block min-w-0 leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-red-500">{difficultyStats.wrong}</span>
                   </div>
-                  <div className="rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block text-[10px] font-black text-gray-400 uppercase">Progress</span>
-                    <span className="text-lg font-black text-blue-600">
+                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
+                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Progress</span>
+                    <span className="block min-w-0 break-keep leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-blue-600">
                       {hasSavedProgress ? `${difficultyStats.currentIndex + 1}/${questionCount}` : `0/${questionCount}`}
                     </span>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Saved Progress</span>
+                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{progressPercent}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white dark:bg-gray-900/70">
+                    <div
+                      className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
                 </div>
               </button>
@@ -319,17 +337,17 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
-          <span className="block text-[10px] font-black uppercase text-gray-400">Correct</span>
-          <span className="text-xl font-black text-green-600">{difficultyStats.correct}</span>
+        <div className="min-w-0 rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
+          <span className="block truncate text-[10px] font-black uppercase text-gray-400">Correct</span>
+          <span className="block min-w-0 leading-none text-[clamp(1rem,5vw,1.25rem)] font-black text-green-600">{difficultyStats.correct}</span>
         </div>
-        <div className="rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
-          <span className="block text-[10px] font-black uppercase text-gray-400">Wrong</span>
-          <span className="text-xl font-black text-red-500">{difficultyStats.wrong}</span>
+        <div className="min-w-0 rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
+          <span className="block truncate text-[10px] font-black uppercase text-gray-400">Wrong</span>
+          <span className="block min-w-0 leading-none text-[clamp(1rem,5vw,1.25rem)] font-black text-red-500">{difficultyStats.wrong}</span>
         </div>
-        <div className="rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
-          <span className="block text-[10px] font-black uppercase text-gray-400">Accuracy</span>
-          <span className="text-xl font-black text-blue-600">{getAccuracy(difficultyStats.correct, difficultyStats.wrong)}%</span>
+        <div className="min-w-0 rounded-2xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10 p-3">
+          <span className="block truncate text-[10px] font-black uppercase text-gray-400">Accuracy</span>
+          <span className="block min-w-0 break-keep leading-none text-[clamp(1rem,5vw,1.25rem)] font-black text-blue-600">{getAccuracy(difficultyStats.correct, difficultyStats.wrong)}%</span>
         </div>
       </div>
 

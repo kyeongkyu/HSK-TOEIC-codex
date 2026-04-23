@@ -15,6 +15,8 @@ import ClientLayoutWrapper from '@/components/ClientLayoutWrapper';
 
 import { Noto_Serif_SC, Noto_Sans_SC, Ma_Shan_Zheng } from 'next/font/google';
 
+export const dynamic = 'force-dynamic';
+
 const notoSerifSC = Noto_Serif_SC({
   weight: ['400', '700'],
   subsets: ['latin'],

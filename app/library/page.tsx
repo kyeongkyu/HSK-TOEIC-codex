@@ -128,7 +128,7 @@ export default function LibraryPage() {
               </div>
               
               <div 
-                className={`flex flex-col items-end text-right z-10 shrink-0 max-w-[42%] ${isMemorizeMode ? 'cursor-pointer' : ''}`}
+                className={`flex flex-col items-end text-right z-10 shrink-0 min-w-[7.75rem] max-w-[46%] ${isMemorizeMode ? 'cursor-pointer' : ''}`}
                 onClick={() => {
                   if (isMemorizeMode) {
                     toggleReveal(word.id);
@@ -136,8 +136,8 @@ export default function LibraryPage() {
                 }}
               >
                 {isMemorizeMode && !revealedWords[word.id] ? (
-                  <div className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Tap to reveal</span>
+                  <div className="min-w-[7.75rem] px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-full text-center">
+                    <span className="block whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Tap to reveal</span>
                   </div>
                 ) : (
                   <>

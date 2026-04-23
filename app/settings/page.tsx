@@ -239,9 +239,11 @@ export default function SettingsPage() {
               </div>
               <button 
                 onClick={toggleCarouselView}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${isCarouselView ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${isCarouselView ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
               >
-                <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${isCarouselView ? 'translate-x-7' : 'translate-x-1'}`} />
+                <span
+                  className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${isCarouselView ? 'translate-x-6' : 'translate-x-0'}`}
+                />
               </button>
             </div>
             
@@ -254,9 +256,11 @@ export default function SettingsPage() {
               </div>
               <button 
                 onClick={toggleHanziWriterMode}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${hanziWriterMode ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${hanziWriterMode ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
               >
-                <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${hanziWriterMode ? 'translate-x-7' : 'translate-x-1'}`} />
+                <span
+                  className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${hanziWriterMode ? 'translate-x-6' : 'translate-x-0'}`}
+                />
               </button>
             </div>
           </div>
@@ -272,9 +276,11 @@ export default function SettingsPage() {
               </div>
               <button 
                 onClick={toggleSeparateLibraryByLevel}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${separateLibraryByLevel ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${separateLibraryByLevel ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
               >
-                <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${separateLibraryByLevel ? 'translate-x-7' : 'translate-x-1'}`} />
+                <span
+                  className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${separateLibraryByLevel ? 'translate-x-6' : 'translate-x-0'}`}
+                />
               </button>
             </div>
           </div>
@@ -318,7 +324,7 @@ export default function SettingsPage() {
                 <button
                   key={font.name}
                   onClick={() => setHanziFont(font.name)}
-                  className={`flex flex-col items-start p-4 rounded-2xl transition-all active:scale-[0.99] transform-gpu ${
+                  className={`flex flex-col items-start px-4 py-3 rounded-2xl transition-all active:scale-[0.99] transform-gpu ${
                     hanziFont === font.name
                       ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-lg shadow-blue-600/20'
                       : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'

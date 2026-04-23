@@ -14,15 +14,24 @@ const hskWordsMap = new Map(hskWords.map(w => [w.word, w]));
 export default function SegmentedSentence({ 
   sentence, 
   hidePlayButton = false,
-  interactive = true
+  interactive = true,
+  className = '',
+  variant = 'default',
 }: { 
   sentence: string; 
   hidePlayButton?: boolean;
   interactive?: boolean;
+  className?: string;
+  variant?: 'default' | 'quizPrompt';
 }) {
   const { ttsSpeed, hanziFont } = useSettings();
   const { userWords, toggleFavorite } = useUserWords();
   const [activeToken, setActiveToken] = useState<number | null>(null);
+
+  const containerClasses =
+    variant === 'quizPrompt'
+      ? 'gap-y-4 gap-x-2 text-6xl sm:text-7xl text-black dark:text-white leading-[0.92] font-black whitespace-nowrap'
+      : 'gap-y-3 gap-x-1 text-xl text-gray-600 dark:text-gray-300 leading-relaxed';
 
   const tokens = useMemo(() => {
     let i = 0;
@@ -61,7 +70,7 @@ export default function SegmentedSentence({
   };
 
   return (
-    <div className="relative flex flex-wrap items-center justify-center gap-y-3 gap-x-1 text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+    <div className={`relative flex flex-wrap items-center justify-center ${containerClasses} ${className}`}>
       {activeToken !== null && (
         <div className="fixed inset-0 z-40" onClick={() => setActiveToken(null)} />
       )}

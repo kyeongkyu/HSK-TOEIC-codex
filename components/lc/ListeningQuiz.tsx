@@ -37,6 +37,13 @@ type LcProgressState = {
   attempts: LcAttemptRecord[];
   bookmarkedIds: string[];
   replayCounts: Record<string, number>;
+  savedSetProgress: Record<string, { currentIndex: number }>;
+};
+
+type LcQuestionSnapshot = {
+  selectedAnswer: LcChoiceId | null;
+  submitted: boolean;
+  showTranscript: boolean;
 };
 
 const STORAGE_KEY = 'toeic_lc_part2_progress';
@@ -44,6 +51,7 @@ const DEFAULT_PROGRESS: LcProgressState = {
   attempts: [],
   bookmarkedIds: [],
   replayCounts: {},
+  savedSetProgress: {},
 };
 
 const MAIN_FILTERS: Array<{ kind: LcFilterKind; label: string; description: string }> = [
@@ -61,7 +69,12 @@ function normalizeProgress(stored: unknown): LcProgressState {
     attempts: Array.isArray(parsed.attempts) ? parsed.attempts : [],
     bookmarkedIds: Array.isArray(parsed.bookmarkedIds) ? parsed.bookmarkedIds : [],
     replayCounts: parsed.replayCounts && typeof parsed.replayCounts === 'object' ? parsed.replayCounts : {},
+    savedSetProgress: parsed.savedSetProgress && typeof parsed.savedSetProgress === 'object' ? parsed.savedSetProgress : {},
   };
+}
+
+function getSetProgressKey(kind: LcFilterKind, value: LcFilterValue) {
+  return `${kind}:${value}`;
 }
 
 function getReviewQuestionIds(progress: LcProgressState, reviewFilter: LcReviewFilter) {
@@ -116,6 +129,7 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [sessionResults, setSessionResults] = useState<LcAttemptRecord[]>([]);
   const [sessionPlayCounts, setSessionPlayCounts] = useState<Record<string, number>>({});
+  const [questionHistory, setQuestionHistory] = useState<Array<LcQuestionSnapshot | null>>([]);
   const questionStartRef = useRef(0);
 
   useEffect(() => {
@@ -151,6 +165,31 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProgress));
   };
 
+  const saveSetProgress = (
+    kind: LcFilterKind,
+    value: LcFilterValue,
+    index: number,
+    totalQuestions: number,
+    sourceProgress = progress,
+  ) => {
+    const progressKey = getSetProgressKey(kind, value);
+    const nextIndex = totalQuestions > 0
+      ? Math.min(Math.max(index, 0), totalQuestions)
+      : 0;
+
+    if ((sourceProgress.savedSetProgress[progressKey]?.currentIndex ?? 0) === nextIndex) {
+      return;
+    }
+
+    saveProgress({
+      ...sourceProgress,
+      savedSetProgress: {
+        ...sourceProgress.savedSetProgress,
+        [progressKey]: { currentIndex: nextIndex },
+      },
+    });
+  };
+
   const categoryCards = useMemo<LcCategoryCard[]>(() => {
     if (!selectedKind) return [];
 
@@ -160,6 +199,16 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
       label: meta.label,
       description: meta.description,
       count: filterQuestions(selectedKind, id as LcFilterValue, progress).length,
+      progressPercent: (() => {
+        const filteredQuestions = filterQuestions(selectedKind, id as LcFilterValue, progress);
+        const savedIndex = Math.min(
+          progress.savedSetProgress[getSetProgressKey(selectedKind, id as LcFilterValue)]?.currentIndex ?? 0,
+          filteredQuestions.length,
+        );
+        return filteredQuestions.length > 0
+          ? Math.round((savedIndex / filteredQuestions.length) * 100)
+          : 0;
+      })(),
     }));
   }, [selectedKind, progress]);
 
@@ -182,25 +231,65 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
     setShowTranscript(false);
   };
 
+  const persistCurrentQuestionState = (overrideIndex?: number) => {
+    if (!currentQuestion || isComplete) return;
+
+    const index = overrideIndex ?? currentIndex;
+    const snapshot: LcQuestionSnapshot = {
+      selectedAnswer,
+      submitted,
+      showTranscript,
+    };
+
+    setQuestionHistory((history) => {
+      const nextHistory = [...history];
+      nextHistory[index] = snapshot;
+      return nextHistory;
+    });
+  };
+
+  useEffect(() => {
+    const snapshot = questionHistory[currentIndex];
+    if (snapshot) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedAnswer(snapshot.selectedAnswer);
+      setSubmitted(snapshot.submitted);
+      setShowTranscript(snapshot.showTranscript);
+      return;
+    }
+
+    resetQuestionState();
+  }, [currentIndex, questionHistory]);
+
   const openFilterKind = (kind: LcFilterKind) => {
     setSelectedKind(kind);
     setSelectedValue(null);
     setCurrentIndex(0);
     setIsComplete(false);
+    setQuestionHistory([]);
     resetQuestionState();
   };
 
   const openQuestionSet = (value: string) => {
+    const nextValue = value as LcFilterValue;
+    const nextQuestions = filterQuestions(selectedKind as LcFilterKind, nextValue, progress);
+    const savedIndex = Math.min(
+      progress.savedSetProgress[getSetProgressKey(selectedKind as LcFilterKind, nextValue)]?.currentIndex ?? 0,
+      Math.max(nextQuestions.length - 1, 0),
+    );
+
     setSelectedValue(value as LcFilterValue);
-    setCurrentIndex(0);
+    setCurrentIndex(savedIndex);
     setIsComplete(false);
     setSessionResults([]);
     setSessionPlayCounts({});
+    setQuestionHistory([]);
     resetQuestionState();
   };
 
   const goBack = () => {
     if (selectedValue) {
+      saveSetProgress(selectedKind as LcFilterKind, selectedValue, currentIndex, questions.length);
       setSelectedValue(null);
       setIsComplete(false);
       resetQuestionState();
@@ -272,24 +361,55 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
     saveProgress(nextProgress);
     setSessionResults((results) => [...results, attempt]);
     setSubmitted(true);
+    setQuestionHistory((history) => {
+      const nextHistory = [...history];
+      nextHistory[currentIndex] = {
+        selectedAnswer,
+        submitted: true,
+        showTranscript: false,
+      };
+      return nextHistory;
+    });
   };
 
   const goNext = () => {
+    persistCurrentQuestionState();
+
     if (currentIndex >= questions.length - 1) {
+      if (selectedKind && selectedValue) {
+        saveSetProgress(selectedKind, selectedValue, questions.length, questions.length);
+      }
       setIsComplete(true);
       tts.stop();
       return;
     }
 
-    setCurrentIndex((index) => index + 1);
-    resetQuestionState();
+    const nextIndex = currentIndex + 1;
+    if (selectedKind && selectedValue) {
+      saveSetProgress(selectedKind, selectedValue, nextIndex, questions.length);
+    }
+    setCurrentIndex(nextIndex);
+  };
+
+  const goPrevious = () => {
+    if (currentIndex === 0) return;
+    persistCurrentQuestionState();
+    const nextIndex = currentIndex - 1;
+    if (selectedKind && selectedValue) {
+      saveSetProgress(selectedKind, selectedValue, nextIndex, questions.length);
+    }
+    setCurrentIndex(nextIndex);
   };
 
   const restartCurrentSet = () => {
+    if (selectedKind && selectedValue) {
+      saveSetProgress(selectedKind, selectedValue, 0, questions.length);
+    }
     setCurrentIndex(0);
     setIsComplete(false);
     setSessionResults([]);
     setSessionPlayCounts({});
+    setQuestionHistory([]);
     resetQuestionState();
   };
 
@@ -489,14 +609,24 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
         </div>
 
         {!submitted && (
-          <button
-            type="button"
-            onClick={submitAnswer}
-            disabled={!selectedAnswer}
-            className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-sm font-black text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
-          >
-            Submit
-          </button>
+          <div className="mt-5 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={goPrevious}
+              disabled={currentIndex === 0}
+              className="flex-1 rounded-2xl bg-gray-100 px-4 py-4 text-sm font-black text-gray-700 transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 dark:bg-gray-800 dark:text-gray-100"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={submitAnswer}
+              disabled={!selectedAnswer}
+              className="flex-1 rounded-2xl bg-black px-4 py-4 text-sm font-black text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              Submit
+            </button>
+          </div>
         )}
 
         {isReviewMode && !submitted && (
@@ -522,7 +652,9 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
               transcript={currentQuestion.transcript}
               showTranscript={showTranscript}
               isLast={currentIndex === questions.length - 1}
+              canGoPrevious={currentIndex > 0}
               onToggleTranscript={() => setShowTranscript((visible) => !visible)}
+              onPrevious={goPrevious}
               onNext={goNext}
             />
           </div>

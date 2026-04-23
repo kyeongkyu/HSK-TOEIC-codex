@@ -104,6 +104,15 @@ export default function Home() {
       icon: <BookOpen size={24} />
     },
     {
+      title: 'Listening',
+      description: '급수와 주제별로 중국어 듣기 연습과 문제를 풀어보세요.',
+      link: '/hsk-listening',
+      accentClass: 'bg-cyan-600 shadow-cyan-600/20 dark:bg-cyan-500 dark:shadow-cyan-500/20',
+      iconClass: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
+      surfaceClass: 'hover:border-cyan-200 dark:hover:border-cyan-500/40',
+      icon: <Headphones size={24} />
+    },
+    {
       title: 'Memorize Words',
       description: '복습이 필요한 단어를 SRS 방식으로 효율적으로 외우세요.',
       link: '/memorize',

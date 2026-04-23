@@ -1,26 +1,6 @@
 import type {NextConfig} from 'next';
 import withPWA from '@ducanh2912/next-pwa';
 
-const offlinePrecacheRoutes = [
-  '/',
-  '/study',
-  '/memorize',
-  '/library',
-  '/library/quiz',
-  '/settings',
-  '/grammar',
-  '/quiz',
-  '/toeic-part2',
-  '/toeic-part5',
-  '/sentence-completion/1',
-  '/sentence-completion/2',
-  '/sentence-completion/3',
-  '/sentence-completion/4',
-  '/sentence-completion/5',
-  '/sentence-completion/6',
-  '/offline.html',
-];
-
 const withPWAConfig = withPWA({
   dest: 'public',
   register: true,
@@ -32,17 +12,16 @@ const withPWAConfig = withPWA({
   fallbacks: {
     document: '/offline.html',
   },
-  workboxOptions: {
-    additionalManifestEntries: offlinePrecacheRoutes.map((url) => ({
-      url,
-      revision: null,
-    })),
-  },
-  disable: process.env.NODE_ENV === 'development',
+  disable: process.env.NODE_ENV === 'development' || process.env.DISABLE_PWA === 'true',
 });
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    cpus: 1,
+    staticGenerationMaxConcurrency: 1,
+    staticGenerationMinPagesPerWorker: 1000,
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

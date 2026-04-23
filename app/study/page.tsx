@@ -14,6 +14,27 @@ import { speak } from '@/lib/tts';
 
 import { Suspense } from 'react';
 
+const getFocusHanziTextSize = (word: string, hanziSize: number) => {
+  const length = Array.from(word).length;
+
+  if (hanziSize === 1) {
+    if (length >= 5) return 'text-3xl';
+    return 'text-4xl';
+  }
+
+  if (hanziSize === 2) {
+    if (length >= 5) return 'text-3xl';
+    if (length === 4) return 'text-4xl';
+    if (length === 3) return 'text-5xl';
+    return 'text-6xl';
+  }
+
+  if (length >= 5) return 'text-5xl';
+  if (length === 4) return 'text-6xl';
+  if (length === 3) return 'text-7xl';
+  return 'text-8xl';
+};
+
 function StudyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,8 +49,6 @@ function StudyContent() {
   const [listReturnHighlightId, setListReturnHighlightId] = useState<string | null>(null);
   const listItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
-
-  const hanziTextSize = hanziSize === 1 ? 'text-4xl' : hanziSize === 2 ? 'text-6xl' : 'text-8xl';
 
   const categories = useMemo(() => {
     const levelNum = Number(selectedLevel);
@@ -169,6 +188,7 @@ function StudyContent() {
 
   const currentWord = filteredWords[currentIndex] || filteredWords[0];
   const isFavorite = userWords[currentWord.id]?.isFavorite || false;
+  const focusHanziTextSize = getFocusHanziTextSize(currentWord.word, hanziSize);
 
   const handlePrev = () => setCurrentIndex(prev => Math.max(0, prev - 1));
   const handleNext = () => setCurrentIndex(prev => Math.min(filteredWords.length - 1, prev + 1));
@@ -269,7 +289,7 @@ function StudyContent() {
   return (
     <div className="flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200">
       {/* Header */}
-      <div className="px-6 pt-8 flex items-center justify-between mb-8">
+      <div className="px-5 pt-4 sm:pt-6 flex items-center justify-between mb-4">
         <div className="flex items-center min-w-0 mr-4">
           <button 
             onClick={() => {
@@ -315,13 +335,13 @@ function StudyContent() {
       </div>
 
       {/* Word Content */}
-      <div className="flex-1 px-6 flex flex-col items-center justify-center text-center space-y-10 w-full max-w-md mx-auto">
+      <div className="flex-1 min-h-0 px-5 flex flex-col items-center justify-start text-center gap-5 w-full max-w-md mx-auto overflow-y-auto pb-3">
         <div className="relative w-full">
           {currentWord.memorizationTip && (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-2xl mb-10 relative"
+              className="p-4 sm:p-5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-2xl mb-5 relative"
             >
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Info size={14} className="text-blue-600 dark:text-blue-400" />
@@ -333,17 +353,17 @@ function StudyContent() {
             </motion.div>
           )}
           
-          <div className="relative inline-block mb-4">
+          <div className="relative inline-block max-w-full mb-3">
             {hanziWriterMode ? (
-              <HanziWord word={currentWord.word} shouldAnimate={true} />
+              <HanziWord word={currentWord.word} shouldAnimate={true} singleLine />
             ) : (
-              <div className={`${hanziTextSize} font-bold text-black dark:text-white`} style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
+              <div className={`${focusHanziTextSize} max-w-full whitespace-nowrap font-bold leading-none tracking-tight text-black dark:text-white`} style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
                 {currentWord.word}
               </div>
             )}
             <button
               onClick={() => toggleFavorite(currentWord.id)}
-              className={`absolute -top-4 -right-12 p-3 rounded-full transition-all active:scale-95 ${
+              className={`absolute -top-3 -right-10 p-3 rounded-full transition-all active:scale-95 ${
                 isFavorite ? 'text-yellow-500' : 'text-gray-200 dark:text-gray-700'
               }`}
             >
@@ -351,11 +371,11 @@ function StudyContent() {
             </button>
           </div>
           
-              <div className="flex flex-col items-center gap-3 w-full">
+              <div className="flex flex-col items-center gap-2.5 w-full">
             <div className="flex items-center justify-center w-full gap-3">
               <div className="w-11" /> {/* Spacer to balance the audio button for center alignment */}
               <div className="flex flex-col items-center">
-                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{currentWord.pinyin.toLowerCase()}</span>
+                <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{currentWord.pinyin.toLowerCase()}</span>
                 {currentWord.phonetic && (
                   <span className="text-sm font-medium text-gray-500 dark:text-gray-400 font-mono mt-1">{currentWord.phonetic}</span>
                 )}
@@ -367,16 +387,16 @@ function StudyContent() {
                 <Volume2 size={20} />
               </button>
             </div>
-            <h2 className="text-4xl font-black text-black dark:text-white">
+            <h2 className="text-3xl sm:text-4xl font-black text-black dark:text-white">
               {currentWord.meaning}
             </h2>
           </div>
         </div>
         
         {currentWord.example && (
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-2.5">
             <div className="h-px w-12 bg-gray-100 dark:bg-gray-800 mx-auto" />
-            <div className="space-y-3" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
+            <div className="space-y-2.5" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
               <SegmentedSentence sentence={currentWord.example} />
               {currentWord.exampleTranslation && (
                 <p className="text-gray-500 dark:text-gray-400 text-sm italic">
@@ -389,11 +409,11 @@ function StudyContent() {
       </div>
 
       {/* Navigation */}
-      <div className="px-6 pb-12 grid grid-cols-2 gap-4">
+      <div className="px-5 pt-2 grid grid-cols-2 gap-3" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
         <button 
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white py-5 rounded-2xl font-bold disabled:opacity-30 active:scale-95 transition-all"
+          className="flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white py-4 rounded-2xl font-bold disabled:opacity-30 active:scale-95 transition-all"
         >
           <ChevronLeft size={20} />
           <span>Previous</span>
@@ -401,7 +421,7 @@ function StudyContent() {
         <button 
           onClick={handleNext}
           disabled={currentIndex === filteredWords.length - 1}
-          className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white py-5 rounded-2xl font-bold disabled:opacity-30 active:scale-95 transition-all shadow-lg shadow-blue-600/20"
+          className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white py-4 rounded-2xl font-bold disabled:opacity-30 active:scale-95 transition-all shadow-lg shadow-blue-600/20"
         >
           <span>Next</span>
           <ChevronRight size={20} />
