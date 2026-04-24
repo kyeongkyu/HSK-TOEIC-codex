@@ -29,7 +29,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [selectedLevel, setSelectedLevel] = useState<number | 'all'>(1);
   const [themeMode, setThemeModeState] = useState<'light' | 'dark' | 'black'>('light');
-  const [isCarouselView, setIsCarouselView] = useState(true);
+  const [isCarouselView, setIsCarouselView] = useState(false);
   const [hanziWriterMode, setHanziWriterMode] = useState(false);
   const [separateLibraryByLevel, setSeparateLibraryByLevel] = useState(false);
   const [hanziFont, setHanziFontState] = useState('Noto Serif SC');
@@ -61,8 +61,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     setThemeModeState(initialTheme);
     
-    const storedCarouselView = localStorage.getItem('hsk_carousel_view');
-    setIsCarouselView(storedCarouselView === null ? true : storedCarouselView === 'true');
+    localStorage.setItem('hsk_carousel_view', 'false');
+    setIsCarouselView(false);
     
     const storedHanziWriterMode = localStorage.getItem('hsk_hanzi_writer_mode');
     setHanziWriterMode(storedHanziWriterMode === 'true');

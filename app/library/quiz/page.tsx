@@ -12,6 +12,8 @@ import { ArrowLeft, Volume2, CheckCircle2, XCircle, RefreshCcw, AlertCircle, Che
 import { motion, AnimatePresence } from 'motion/react';
 import { speak } from '@/lib/tts';
 import SegmentedSentence from '@/components/SegmentedSentence';
+import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { clampCount, getProgressPercent } from '@/lib/ui-state';
 
 type QuestionFormat = 'hanzi-to-meaning' | 'meaning-to-hanzi' | 'sentence-fill' | 'sentence-unscramble-ko' | 'sentence-unscramble-zh';
 
@@ -26,6 +28,44 @@ interface LibraryQuizQuestion {
 }
 
 type QuizState = 'answering' | 'feedback' | 'finished';
+type LibraryQuizSnapshot = {
+  quizState: Exclude<QuizState, 'finished'>;
+  selectedOption: string | null;
+  userTokens: string[];
+  shuffledTokens: string[];
+};
+
+function shuffleArray<T>(items: T[]) {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
+function getSafeQuizResultStats(score: number, totalQuestions: number) {
+  const displayScore = clampCount(score, totalQuestions);
+  const displayAccuracy = totalQuestions > 0
+    ? Math.round((displayScore / totalQuestions) * 100)
+    : 0;
+
+  return { displayScore, displayAccuracy };
+}
+
+function getWordDistractorPool(word: WordData, preferredWords: WordData[]) {
+  const sameLevelPreferred = preferredWords.filter(w => w.id !== word.id && w.level === word.level);
+  const sameLevelGlobal = hskWords.filter(w => w.id !== word.id && w.level === word.level && !sameLevelPreferred.some(p => p.id === w.id));
+  const lowerOrSameLevel = hskWords.filter(
+    w => w.id !== word.id
+      && w.level <= word.level
+      && !sameLevelPreferred.some(p => p.id === w.id)
+      && !sameLevelGlobal.some(p => p.id === w.id),
+  );
+  const fallback = hskWords.filter(
+    w => w.id !== word.id
+      && !sameLevelPreferred.some(p => p.id === w.id)
+      && !sameLevelGlobal.some(p => p.id === w.id)
+      && !lowerOrSameLevel.some(p => p.id === w.id),
+  );
+
+  return [...sameLevelPreferred, ...sameLevelGlobal, ...lowerOrSameLevel, ...fallback];
+}
 
 export default function LibraryQuizPage() {
   const router = useRouter();
@@ -41,6 +81,7 @@ export default function LibraryQuizPage() {
   const [score, setScore] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
+  const [questionSnapshots, setQuestionSnapshots] = useState<Array<LibraryQuizSnapshot | null>>([]);
 
   // Get library words
   const libraryWords = useMemo(() => {
@@ -81,7 +122,7 @@ export default function LibraryQuizPage() {
     if (libraryWords.length === 0 || questions.length > 0) return;
     
     // Shuffle library words for questions
-    const shuffled = [...libraryWords].sort(() => Math.random() - 0.5);
+    const shuffled = shuffleArray(libraryWords);
     
     const generatedQuestions: LibraryQuizQuestion[] = shuffled.map(word => {
       const matchingSentences = sentences.filter(s => s.chinese && s.chinese.includes(word.word));
@@ -94,23 +135,9 @@ export default function LibraryQuizPage() {
       const format = formats[Math.floor(Math.random() * formats.length)];
       
       if (format === 'hanzi-to-meaning' || format === 'meaning-to-hanzi') {
-        const levelWords = hskWords.filter(w => !separateLibraryByLevel || selectedLevel === 'all' || w.level === selectedLevel);
-        
-        let wrongOptions = levelWords
-          .filter(w => w.id !== word.id)
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 3);
-          
-        // Fallback if not enough words in the same level
-        if (wrongOptions.length < 3) {
-          const otherWords = hskWords
-            .filter(w => w.id !== word.id && !wrongOptions.find(wo => wo.id === w.id))
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3 - wrongOptions.length);
-          wrongOptions = [...wrongOptions, ...otherWords];
-        }
+        const wrongOptions = shuffleArray(getWordDistractorPool(word, libraryWords)).slice(0, 3);
 
-        const options = [...wrongOptions, word].sort(() => Math.random() - 0.5);
+        const options = shuffleArray([...wrongOptions, word]);
         return { format, word, options };
       } else {
         const sentence = matchingSentences[Math.floor(Math.random() * matchingSentences.length)];
@@ -120,35 +147,26 @@ export default function LibraryQuizPage() {
         let shuffledTokens: string[] = [];
         
         if (format === 'sentence-fill') {
-          const levelWords = hskWords.filter(w => !separateLibraryByLevel || selectedLevel === 'all' || w.level === selectedLevel);
-          let distractors = levelWords.filter(w => w.word !== word.word).sort(() => Math.random() - 0.5).slice(0, 3).map(w => w.word);
-          
+          let distractors = shuffleArray(getWordDistractorPool(word, libraryWords))
+            .filter(w => w.word !== word.word && !sentence.chinese.includes(w.word))
+            .slice(0, 3)
+            .map(w => w.word);
+
           if (distractors.length < 3) {
-            const otherDistractors = hskWords
+            const fallbackDistractors = shuffleArray(getWordDistractorPool(word, libraryWords))
               .filter(w => w.word !== word.word && !distractors.includes(w.word))
-              .sort(() => Math.random() - 0.5)
               .slice(0, 3 - distractors.length)
               .map(w => w.word);
-            distractors = [...distractors, ...otherDistractors];
+            distractors = [...distractors, ...fallbackDistractors];
           }
           
-          stringOptions = [...distractors, word.word].sort(() => Math.random() - 0.5);
+          stringOptions = shuffleArray([...distractors, word.word]);
         } else if (format === 'sentence-unscramble-ko') {
           correctTokens = sentence.koreanTokens;
-          const otherKoreanTokens = sentences
-            .filter(os => os.id !== sentence.id)
-            .flatMap(os => os.koreanTokens)
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3);
-          shuffledTokens = [...correctTokens, ...otherKoreanTokens].sort(() => Math.random() - 0.5);
+          shuffledTokens = shuffleArray(correctTokens);
         } else if (format === 'sentence-unscramble-zh') {
           correctTokens = sentence.tokens;
-          const otherChineseTokens = sentences
-            .filter(os => os.id !== sentence.id)
-            .flatMap(os => os.tokens)
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3);
-          shuffledTokens = [...correctTokens, ...otherChineseTokens].sort(() => Math.random() - 0.5);
+          shuffledTokens = shuffleArray(correctTokens);
         }
         
         return { format, word, sentence, stringOptions, correctTokens, shuffledTokens };
@@ -165,6 +183,7 @@ export default function LibraryQuizPage() {
   }, [wordsLoaded, libraryWords.length, router]);
 
   const currentQuestion = questions[currentIndex];
+  const currentSnapshot = questionSnapshots[currentIndex];
 
   const isCorrect = useMemo(() => {
     if (!currentQuestion) return false;
@@ -177,13 +196,38 @@ export default function LibraryQuizPage() {
     }
   }, [currentQuestion, selectedOption, userTokens]);
 
+  const saveCurrentSnapshot = () => {
+    if (!currentQuestion || quizState === 'finished') return;
+    const snapshot: LibraryQuizSnapshot = {
+      quizState,
+      selectedOption,
+      userTokens,
+      shuffledTokens,
+    };
+    setQuestionSnapshots(prev => {
+      const next = [...prev];
+      next[currentIndex] = snapshot;
+      return next;
+    });
+  };
+
   useEffect(() => {
-    if (currentQuestion) {
-      if (currentQuestion.shuffledTokens) {
-        setShuffledTokens([...currentQuestion.shuffledTokens]);
-      }
+    if (!currentQuestion) return;
+    if (quizState === 'finished') return;
+
+    if (currentSnapshot) {
+      setQuizState(currentSnapshot.quizState);
+      setSelectedOption(currentSnapshot.selectedOption);
+      setUserTokens(currentSnapshot.userTokens);
+      setShuffledTokens(currentSnapshot.shuffledTokens);
+      return;
     }
-  }, [currentIndex, questions, currentQuestion]);
+
+    setQuizState('answering');
+    setSelectedOption(null);
+    setUserTokens([]);
+    setShuffledTokens(currentQuestion.shuffledTokens ? [...currentQuestion.shuffledTokens] : []);
+  }, [currentIndex, currentQuestion, currentSnapshot, quizState]);
 
   // Auto-play TTS
   useEffect(() => {
@@ -214,7 +258,7 @@ export default function LibraryQuizPage() {
       isAnsCorrect = optionValue === currentQuestion.word.word;
     }
     
-    handleAnswer(isAnsCorrect);
+    handleAnswer(isAnsCorrect, optionValue);
   };
 
   const handleTokenClick = (token: string, idx: number) => {
@@ -225,17 +269,14 @@ export default function LibraryQuizPage() {
     }
 
     const newUserTokens = [...userTokens, token];
+    const nextShuffledTokens = shuffledTokens.filter((_, tokenIndex) => tokenIndex !== idx);
     setUserTokens(newUserTokens);
     
-    setShuffledTokens(prev => {
-      const next = [...prev];
-      next.splice(idx, 1);
-      return next;
-    });
+    setShuffledTokens(nextShuffledTokens);
     
     if (currentQuestion.correctTokens && newUserTokens.length === currentQuestion.correctTokens.length) {
       const isAnsCorrect = newUserTokens.join('') === currentQuestion.correctTokens.join('');
-      handleAnswer(isAnsCorrect);
+      handleAnswer(isAnsCorrect, null, newUserTokens, nextShuffledTokens);
     }
   };
 
@@ -251,35 +292,50 @@ export default function LibraryQuizPage() {
     setShuffledTokens(prev => [...prev, token]);
   };
 
-  const handleAnswer = (isAnsCorrect: boolean) => {
+  const handleAnswer = (
+    isAnsCorrect: boolean,
+    answerValue: string | null = selectedOption,
+    answerTokens = userTokens,
+    answerShuffledTokens = shuffledTokens,
+  ) => {
     setQuizState('feedback');
     if (isAnsCorrect) {
-      setScore(s => s + 1);
+      if (questionSnapshots[currentIndex]?.quizState !== 'feedback') {
+        setScore(s => s + 1);
+      }
       if (currentQuestion.format === 'hanzi-to-meaning' || currentQuestion.format === 'meaning-to-hanzi') {
         speak(currentQuestion.word.word, ttsSpeed);
       } else if (currentQuestion.sentence) {
         speak(currentQuestion.sentence.chinese, ttsSpeed);
       }
     }
+
+    setQuestionSnapshots(prev => {
+      const next = [...prev];
+      next[currentIndex] = {
+        quizState: 'feedback',
+        selectedOption: answerValue,
+        userTokens: answerTokens,
+        shuffledTokens: answerShuffledTokens,
+      };
+      return next;
+    });
   };
 
   const handleNext = () => {
+    saveCurrentSnapshot();
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(i => i + 1);
-      setQuizState('answering');
-      setSelectedOption(null);
-      setUserTokens([]);
     } else {
+      localStorage.removeItem('library-quiz-progress');
       setQuizState('finished');
     }
   };
 
   const handlePrevious = () => {
     if (currentIndex > 0) {
+      saveCurrentSnapshot();
       setCurrentIndex(i => i - 1);
-      setQuizState('answering');
-      setSelectedOption(null);
-      setUserTokens([]);
     }
   };
 
@@ -289,6 +345,8 @@ export default function LibraryQuizPage() {
     setQuizState('answering');
     setSelectedOption(null);
     setUserTokens([]);
+    setShuffledTokens([]);
+    setQuestionSnapshots([]);
     setScore(0);
     localStorage.removeItem('library-quiz-progress');
   };
@@ -334,46 +392,50 @@ export default function LibraryQuizPage() {
     );
   }
 
+  const activeTotal = questions.length;
+  const activePosition = activeTotal > 0 ? Math.min(currentIndex + 1, activeTotal) : 0;
+  const activeProgressPercent = getProgressPercent(activePosition, activeTotal);
+
   if (quizState === 'finished') {
-    const accuracy = Math.round((score / questions.length) * 100);
+    const { displayScore, displayAccuracy } = getSafeQuizResultStats(score, questions.length);
     return (
-      <div className="px-6 min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center text-center">
+      <div className="p-6 min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center text-center">
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
+          initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-full max-w-md overflow-hidden bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-[2rem] p-8 sm:p-10"
+          className="w-full max-w-md overflow-hidden bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-[3rem] p-8 sm:p-10 shadow-xl"
         >
-          <div className="w-24 h-24 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-yellow-600/20">
+          <div className="w-24 h-24 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
             <Trophy className="text-yellow-600 dark:text-yellow-400" size={48} />
           </div>
           
-          <h1 className="text-[clamp(2rem,9vw,3.4rem)] leading-none font-black text-black dark:text-white mb-2">학습 완료!</h1>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-10">
+          <h1 className="text-[clamp(2rem,9vw,3rem)] leading-none font-black text-black dark:text-white mb-2">Quiz Finished!</h1>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium mb-8 uppercase tracking-[0.28em]">
             Library Quiz • {questions.length} Words
           </p>
           
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-10">
-            <div className="min-w-0 p-4 sm:p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-2xl">
-              <div className="min-w-0 text-[clamp(1.9rem,9vw,3rem)] leading-none font-black text-blue-600 dark:text-blue-400 mb-2">{accuracy}%</div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Accuracy</div>
+            <div className="min-w-0 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="min-w-0 text-[clamp(2.15rem,11vw,4rem)] leading-none font-black text-blue-600 dark:text-blue-400 mb-2">{displayAccuracy}%</div>
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Accuracy</div>
             </div>
-            <div className="min-w-0 p-4 sm:p-6 bg-gray-100 dark:bg-gray-800 rounded-2xl">
-              <div className="min-w-0 break-keep text-[clamp(1.7rem,8vw,2.8rem)] leading-none font-black text-black dark:text-white mb-2">{score}/{questions.length}</div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Correct</div>
+            <div className="min-w-0 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="min-w-0 break-keep text-[clamp(1.9rem,9vw,3.6rem)] leading-none font-black text-green-600 dark:text-green-400 mb-2">{displayScore}/{questions.length}</div>
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Correct</div>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <button 
               onClick={handleRestart}
-              className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white w-full py-5 rounded-2xl font-bold text-base sm:text-lg active:scale-95 transition-all shadow-lg shadow-blue-600/20"
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-base sm:text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
             >
               <RefreshCcw size={20} />
               <span>다시 풀기</span>
             </button>
             <button 
               onClick={() => router.push('/library')}
-              className="text-sm font-bold text-gray-400 hover:text-black dark:hover:text-white transition-colors pt-4"
+              className="w-full py-4 text-sm sm:text-base text-gray-500 dark:text-gray-400 font-bold hover:text-black dark:hover:text-white transition-colors"
             >
               라이브러리로 돌아가기
             </button>
@@ -384,41 +446,38 @@ export default function LibraryQuizPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
+      <div className="p-6 min-h-screen bg-white dark:bg-gray-900 flex flex-col transition-colors duration-200">
       {/* Header */}
-      <div className="px-6 pt-8 flex items-center mb-8 relative">
-        <div className="flex-1 flex justify-start">
+      <div className="flex items-center justify-between mb-8">
           <button 
             onClick={() => router.push('/library')}
-            className="p-3 -ml-3 text-black dark:text-white bg-gray-100 dark:bg-gray-800 rounded-2xl active:scale-95 transition-all"
+            className="p-2 -ml-2 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={24} />
           </button>
-        </div>
         
-        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
-            Library Quiz
-          </span>
-          <div className="flex gap-1">
-            {questions.map((_, i) => (
-              <div 
-                key={i} 
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i < currentIndex ? 'w-3 bg-blue-600 dark:bg-blue-500' : 
-                  i === currentIndex ? 'w-6 bg-blue-600 dark:bg-blue-500' : 'w-1.5 bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-            ))}
+        <div className="flex min-w-0 flex-1 flex-col items-center px-3">
+          <div className="mb-2 flex w-full max-w-[220px] items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+              Library Quiz
+            </span>
+            <span className="shrink-0 text-[10px] font-black text-blue-600 dark:text-blue-400 tabular-nums leading-none">
+              {activePosition}/{activeTotal} • {activeProgressPercent}%
+            </span>
           </div>
+          <ProgressMeter
+            className="w-full max-w-[220px]"
+            percent={activeProgressPercent}
+            ariaLabel="Library quiz progress"
+            trackClassName="bg-gray-100 dark:bg-gray-800"
+            fillClassName="bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.35)] duration-300 ease-out dark:bg-blue-400"
+          />
         </div>
         
-        <div className="flex-1 flex justify-end">
-          <div className="w-11 -mr-3" />
-        </div>
+        <div className="w-10" />
       </div>
 
-      <div className="flex-1 px-6 flex flex-col items-center justify-center max-w-2xl mx-auto w-full">
+      <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full">
         <AnimatePresence mode="wait">
           <motion.div 
             key={currentIndex}
@@ -436,7 +495,8 @@ export default function LibraryQuizPage() {
                     <SegmentedSentence 
                       sentence={currentQuestion.word.word} 
                       hidePlayButton 
-                      interactive={quizState === 'feedback'}
+                      variant="quizPrompt"
+                      interactive={false}
                     />
                   </div>
                   <button 

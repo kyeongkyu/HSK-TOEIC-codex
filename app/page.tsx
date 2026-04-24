@@ -1,9 +1,7 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 import { useUserWords } from '@/hooks/use-user-words';
 import { useSettings } from '@/hooks/use-settings';
 import { hskWords } from '@/data/hsk';
-import { toeicWords } from '@/data/toeic';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
@@ -12,10 +10,16 @@ import { motion, useMotionValue, useTransform, animate, PanInfo, AnimatePresence
 import { EntryScreen } from '@/components/entry-screen';
 import { BookOpen, Brain, CheckSquare, ChevronRight, PenTool, ArrowLeft, Briefcase, Monitor, Users, ShoppingCart, Landmark, TrendingUp, Utensils, Plane, Stethoscope, Building, Megaphone, Headphones, Database, Truck, FileText, Factory, Calendar, ShieldCheck, Volume2, Star, X } from 'lucide-react';
 import { speak } from '@/lib/tts';
+import type { WordData } from '@/lib/srs';
 
 const CARD_WIDTH = 280;
 const GAP = 16;
 const OFFSET = CARD_WIDTH + GAP;
+
+type ToeicWord = WordData & {
+  topicId: string;
+  phonetic?: string;
+};
 
 type CarouselCardData = {
   title: string;
@@ -90,8 +94,31 @@ export default function Home() {
   const [toeicWordIndex, setToeicWordIndex] = useState(0);
   const [toeicStudyMode, setToeicStudyMode] = useState<'focus' | 'list'>('focus');
   const [showToeicWordList, setShowToeicWordList] = useState(false);
+  const [toeicWords, setToeicWords] = useState<ToeicWord[]>([]);
   const [cardIndex, setCardIndex] = useState(0);
   const x = useMotionValue(0);
+
+  useEffect(() => {
+    if (appMode !== 'toeic') return;
+
+    let isCancelled = false;
+    void import('@/data/toeic').then(({ toeicWords: words }) => {
+      if (!isCancelled) {
+        setToeicWords(words);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [appMode]);
+
+  const toeicWordsByTopic = useMemo(() => (
+    toeicWords.reduce<Record<string, ToeicWord[]>>((groups, word) => {
+      (groups[word.topicId] ??= []).push(word);
+      return groups;
+    }, {})
+  ), [toeicWords]);
 
   const cards = useMemo<CarouselCardData[]>(() => [
     {
@@ -129,6 +156,15 @@ export default function Home() {
       iconClass: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
       surfaceClass: 'hover:border-amber-200 dark:hover:border-amber-500/40',
       icon: <CheckSquare size={24} />
+    },
+    {
+      title: 'Sentence Study',
+      description: '급수별 예문을 읽고 병음, 해석, 표현, 문법 포인트를 단계적으로 확인하세요.',
+      link: '/sentence-study',
+      accentClass: 'bg-sky-600 shadow-sky-600/20 dark:bg-sky-500 dark:shadow-sky-500/20',
+      iconClass: 'bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
+      surfaceClass: 'hover:border-sky-200 dark:hover:border-sky-500/40',
+      icon: <FileText size={24} />
     },
     {
       title: 'Sentence Mode',
@@ -191,7 +227,7 @@ export default function Home() {
       
     const fIds = new Set(fw.map(w => w.id));
 
-    const dw = Object.values(userWords).filter(w => fIds.has(w.id) && w.nextReview <= (now || 0)).length;
+    const dw = fw.filter(w => (userWords[w.id]?.nextReview ?? 0) <= (now || 0)).length;
     const ww = Object.values(userWords).filter(w => fIds.has(w.id) && w.wrongCount > 0).length;
     
     return { dueWords: dw, wrongWords: ww, totalWords: fw.length };
@@ -298,7 +334,7 @@ export default function Home() {
             className="flex flex-col gap-6"
           >
             {(() => {
-              const filteredToeicWords = toeicWords.filter(w => w.topicId === selectedToeicTopicId);
+              const filteredToeicWords = toeicWordsByTopic[selectedToeicTopicId] ?? [];
               if (filteredToeicWords.length === 0) {
                 return (
                   <div className="flex flex-col items-center justify-center py-24 text-center gap-6 bg-gray-50/50 dark:bg-gray-800/30 rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-gray-700">

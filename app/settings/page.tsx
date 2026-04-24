@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { useSettings } from '@/hooks/use-settings';
-import { hskWords } from '@/data/hsk';
-import { toeicWords } from '@/data/toeic';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -10,13 +8,15 @@ type ResetScope = 'hsk' | 'toeic';
 type StoredUserWords = Record<string, unknown>;
 
 const USER_WORDS_KEY = 'hsk_user_words';
-const HSK_WORD_IDS = new Set<string>(hskWords.map((word) => word.id));
-const TOEIC_WORD_IDS = new Set<string>(toeicWords.map((word) => word.id));
+const HSK_WORD_ID_PATTERN = /^\d+$/;
+
+function isUserWordInScope(id: string, scope: ResetScope) {
+  const isHskWord = HSK_WORD_ID_PATTERN.test(id);
+  return scope === 'hsk' ? isHskWord : !isHskWord;
+}
 
 export default function SettingsPage() {
   const { 
-    selectedLevel, 
-    setLevel, 
     themeMode,
     setThemeMode,
     isCarouselView,
@@ -45,9 +45,8 @@ export default function SettingsPage() {
 
     try {
       const userWords = JSON.parse(rawUserWords) as StoredUserWords;
-      const resetIds = scope === 'hsk' ? HSK_WORD_IDS : TOEIC_WORD_IDS;
       const preservedUserWords = Object.fromEntries(
-        Object.entries(userWords).filter(([id]) => !resetIds.has(id))
+        Object.entries(userWords).filter(([id]) => !isUserWordInScope(id, scope))
       );
 
       if (Object.keys(preservedUserWords).length > 0) {
@@ -74,6 +73,8 @@ export default function SettingsPage() {
             'hsk_hanzi_font',
             'hsk_hanzi_size',
             'hsk_separate_library_by_level',
+            'hsk_grammar_progress',
+            'hsk_sentence_study_bookmarks',
             'sentence_completion_progress'
           ]
         : ['toeic_part5_stats', 'toeic_lc_part2_progress'];
@@ -228,6 +229,36 @@ export default function SettingsPage() {
 
       <div className="space-y-10">
         {renderThemeMode()}
+
+        <section>
+          <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Audio Speed</h2>
+          <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-bold text-black dark:text-white">TTS Speed</span>
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 italic">{ttsSpeedLabels[ttsSpeed - 1]}</span>
+              </div>
+              <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 p-1.5 rounded-full">
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setTtsSpeed(level)}
+                    className={`flex-1 py-3 rounded-full text-sm font-bold transition-all active:scale-[0.98] transform-gpu ${
+                      ttsSpeed === level
+                        ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic">
+                Adjust the pronunciation speed for words and sentences.
+              </p>
+            </div>
+          </div>
+        </section>
         
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Display</h2>
@@ -342,67 +373,6 @@ export default function SettingsPage() {
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic mt-4">
               Choose your preferred font for Chinese characters.
             </p>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Audio Speed</h2>
-          <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
-            <div className="flex flex-col gap-6">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-black dark:text-white">TTS Speed</span>
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 italic">{ttsSpeedLabels[ttsSpeed - 1]}</span>
-              </div>
-              <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 p-1.5 rounded-full">
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setTtsSpeed(level)}
-                    className={`flex-1 py-3 rounded-full text-sm font-bold transition-all active:scale-[0.98] transform-gpu ${
-                      ttsSpeed === level
-                        ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic">
-                Adjust the pronunciation speed for words and sentences.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">HSK Level</h2>
-          <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-4">
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 2, 3, 4].map(level => (
-                <button
-                  key={level}
-                  onClick={() => setLevel(level)}
-                  className={`py-4 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] transform-gpu ${
-                    selectedLevel === level 
-                      ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-lg shadow-blue-600/20' 
-                      : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  Level {level}
-                </button>
-              ))}
-              <button
-                onClick={() => setLevel('all')}
-                className={`col-span-2 py-4 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] transform-gpu ${
-                  selectedLevel === 'all' 
-                    ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-lg shadow-blue-600/20' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                All Levels
-              </button>
-            </div>
           </div>
         </section>
 

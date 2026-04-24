@@ -29,6 +29,8 @@ import {
 import { useSettings } from '@/hooks/use-settings';
 import { useHskTTS } from '@/hooks/useHskTTS';
 import { formatPinyin } from '@/lib/pinyin';
+import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { getProgressPercent } from '@/lib/ui-state';
 
 type Step = 'topic' | 'mode' | 'review-filter' | 'questions' | 'results';
 type StudyMode = 'practice' | 'quiz' | 'review';
@@ -125,11 +127,6 @@ function getSetProgressKey(
   return mode === 'review'
     ? `${level}:${topic}:review:${filter ?? 'all'}`
     : `${level}:${topic}:${mode}`;
-}
-
-function getProgressPercent(currentIndex: number, totalQuestions: number) {
-  if (totalQuestions === 0) return 0;
-  return Math.round((Math.min(Math.max(currentIndex, 0), totalQuestions) / totalQuestions) * 100);
 }
 
 export default function HskListeningPage() {
@@ -451,22 +448,13 @@ export default function HskListeningPage() {
             {count}
           </p>
           {typeof progressPercent === 'number' && (
-            <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
-                  Progress
-                </span>
-                <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">
-                  {progressPercent}%
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white dark:bg-gray-900/70">
-                <div
-                  className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
+            <ProgressMeter
+              className="mt-3"
+              percent={progressPercent}
+              label="Progress"
+              valueLabel={`${progressPercent}%`}
+              trackClassName="bg-white dark:bg-gray-900/70"
+            />
           )}
         </div>
         <div className="shrink-0 rounded-2xl bg-white p-3 text-gray-400 shadow-sm transition-all group-hover:bg-blue-600 group-hover:text-white dark:bg-white/10">

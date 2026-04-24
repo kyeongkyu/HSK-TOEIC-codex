@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import React from 'react';
 import { useSettings } from '@/context/SettingsContext';
 
-const PREFETCH_ROUTES = ['/', '/study', '/hsk-listening', '/library', '/settings'] as const;
+const HSK_PREFETCH_ROUTES = ['/', '/study', '/hsk-listening', '/sentence-study', '/library', '/settings', '/quiz', '/memorize', '/grammar'] as const;
+const TOEIC_PREFETCH_ROUTES = ['/', '/library', '/settings', '/toeic-part2', '/toeic-part5'] as const;
 const pageTransitionVariants = {
   initial: (direction: number) => ({ opacity: 0, x: direction * 24, scale: 0.992 }),
   animate: { opacity: 1, x: 0, scale: 1 },
@@ -49,8 +50,24 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   }, [currentIndex]);
 
   React.useEffect(() => {
-    if (appMode !== 'hsk') return;
-    PREFETCH_ROUTES.forEach(route => router.prefetch(route));
+    const routes = appMode === 'hsk'
+      ? HSK_PREFETCH_ROUTES
+      : appMode === 'toeic'
+        ? TOEIC_PREFETCH_ROUTES
+        : [];
+    if (routes.length === 0) return;
+
+    const prefetchRoutes = () => {
+      routes.forEach(route => router.prefetch(route));
+    };
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetchRoutes, { timeout: 2000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(prefetchRoutes, 300);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [appMode, router]);
 
   const isHomeScreen = pathname === '/' && (appMode !== 'toeic' || rootView === 'home');

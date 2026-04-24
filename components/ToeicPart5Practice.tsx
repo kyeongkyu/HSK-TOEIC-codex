@@ -9,6 +9,9 @@ import {
   ToeicPart5Difficulty,
   ToeicPart5Question,
 } from '@/data/toeic-part5';
+import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { StatCard } from '@/components/ui/StatCard';
+import { getProgressPercent, readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
 
 type Part5Stats = Record<ToeicPart5Difficulty, {
   correct: number;
@@ -49,11 +52,6 @@ function getDifficultyQuestionCount(difficulty: ToeicPart5Difficulty) {
   return questionCountByDifficulty[difficulty];
 }
 
-function getProgressPercent(currentIndex: number, total: number) {
-  if (total === 0) return 0;
-  return Math.round((Math.min(Math.max(currentIndex, 0), total) / total) * 100);
-}
-
 function normalizeStats(stored: unknown): Part5Stats {
   const parsed = stored && typeof stored === 'object' ? stored as Partial<Record<ToeicPart5Difficulty, Partial<Part5Stats[ToeicPart5Difficulty]>>> : {};
 
@@ -85,15 +83,11 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
   const [stats, setStats] = useState<Part5Stats>(defaultStats);
 
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey);
+    const stored = readLocalStorageJson<unknown | null>(storageKey, null);
     if (!stored) return;
 
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrates persisted Part 5 progress after mount without changing first render behavior.
-      setStats(normalizeStats(JSON.parse(stored)));
-    } catch {
-      setStats(defaultStats);
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrates persisted Part 5 progress after mount without changing first render behavior.
+    setStats(normalizeStats(stored));
   }, []);
 
   useEffect(() => {
@@ -102,7 +96,7 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
 
   const saveStats = (nextStats: Part5Stats) => {
     setStats(nextStats);
-    localStorage.setItem(storageKey, JSON.stringify(nextStats));
+    writeLocalStorageJson(storageKey, nextStats);
   };
 
   const saveProgress = (difficulty: ToeicPart5Difficulty, index: number, sourceStats = stats) => {
@@ -235,33 +229,21 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
                   <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 leading-relaxed">{meta.description}</p>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Correct</span>
-                    <span className="block min-w-0 leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-green-600">{difficultyStats.correct}</span>
-                  </div>
-                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Wrong</span>
-                    <span className="block min-w-0 leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-red-500">{difficultyStats.wrong}</span>
-                  </div>
-                  <div className="min-w-0 rounded-xl bg-white dark:bg-gray-900/60 p-3">
-                    <span className="block truncate text-[10px] font-black text-gray-400 uppercase">Progress</span>
-                    <span className="block min-w-0 break-keep leading-none text-[clamp(0.95rem,4.8vw,1.125rem)] font-black text-blue-600">
-                      {hasSavedProgress ? `${difficultyStats.currentIndex + 1}/${questionCount}` : `0/${questionCount}`}
-                    </span>
-                  </div>
+                  <StatCard label="Correct" value={difficultyStats.correct} tone="green" />
+                  <StatCard label="Wrong" value={difficultyStats.wrong} tone="red" />
+                  <StatCard
+                    label="Progress"
+                    value={hasSavedProgress ? `${difficultyStats.currentIndex + 1}/${questionCount}` : `0/${questionCount}`}
+                    tone="blue"
+                  />
                 </div>
-                <div className="mt-4">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Saved Progress</span>
-                    <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{progressPercent}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-white dark:bg-gray-900/70">
-                    <div
-                      className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
+                <ProgressMeter
+                  className="mt-4"
+                  percent={progressPercent}
+                  label="Saved Progress"
+                  valueLabel={`${progressPercent}%`}
+                  trackClassName="bg-white dark:bg-gray-900/70"
+                />
               </button>
 
               {isExpanded && (

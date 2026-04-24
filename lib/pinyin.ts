@@ -19,7 +19,7 @@ function getToneTargetIndex(syllable: string) {
   if (ouIndex !== -1) return ouIndex;
 
   for (let index = lower.length - 1; index >= 0; index -= 1) {
-    if ('io uü'.replace(/\s/g, '').includes(lower[index])) return index;
+    if ('iouü'.includes(lower[index])) return index;
   }
 
   return -1;

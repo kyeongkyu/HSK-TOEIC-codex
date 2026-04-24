@@ -1,6 +1,18 @@
+export type GrammarPracticeQuestionType = 'multiple_choice' | 'fill_blank';
+
 export interface GrammarExample {
   chinese: string;
-  translation: string;
+  pinyin: string;
+  translationKo: string;
+}
+
+export interface GrammarPracticeQuestion {
+  id: string;
+  type: GrammarPracticeQuestionType;
+  prompt: string;
+  choices?: string[];
+  answer: string;
+  explanation: string;
 }
 
 export interface GrammarPoint {
@@ -8,294 +20,1344 @@ export interface GrammarPoint {
   level: 1 | 2 | 3 | 4 | 5 | 6;
   title: string;
   pattern: string;
+  summary: string;
   explanation: string;
+  usage: string;
+  commonMistake?: string;
+  tags: string[];
   examples: GrammarExample[];
+  practiceQuestions: GrammarPracticeQuestion[];
 }
 
+const makeGrammarPoint = (
+  point: Omit<GrammarPoint, 'practiceQuestions'> & {
+    practice: Omit<GrammarPracticeQuestion, 'id'>;
+  }
+): GrammarPoint => ({
+  ...point,
+  practiceQuestions: [{ ...point.practice, id: `${point.id}-q1` }],
+});
+
 export const grammarData: GrammarPoint[] = [
-  // HSK 1
-  {
+  makeGrammarPoint({
     id: 'hsk1-shi',
     level: 1,
-    title: '是 (shì) 동사문',
+    title: '是 문장',
     pattern: 'A + 是 + B',
-    explanation: "'是'는 '~이다'라는 뜻으로, 주어와 명사(보어)를 연결하여 신분, 직업, 국적 등을 나타냅니다.",
+    summary: 'A가 B임을 말하는 가장 기본적인 판단문입니다.',
+    explanation: '사람의 신분, 직업, 국적, 관계를 말할 때 是로 주어와 보어를 연결합니다.',
+    usage: '자기소개, 직업 소개, “이것은 무엇이다”를 말할 때 가장 먼저 익혀야 하는 구조입니다.',
+    commonMistake: '형용사 문장에는 보통 是를 쓰지 않습니다. “我很忙”처럼 말합니다.',
+    tags: ['identity', 'basic sentence'],
     examples: [
-      { chinese: '我是学生。', translation: '나는 학생입니다.' },
-      { chinese: '他是老师。', translation: '그는 선생님입니다.' }
-    ]
-  },
-  {
-    id: 'hsk1-you',
-    level: 1,
-    title: '有 (yǒu) 동사문',
-    pattern: 'A + 有 + B',
-    explanation: "'有'는 '가지고 있다' 또는 '~이 있다'라는 뜻으로, 소유를 나타내거나 특정 장소에 사람/사물이 존재함을 나타냅니다.",
-    examples: [
-      { chinese: '我有钱。', translation: '나는 돈이 있습니다.' },
-      { chinese: '他有一个女儿。', translation: '그는 딸이 한 명 있습니다.' }
-    ]
-  },
-  {
+      { chinese: '我是学生。', pinyin: 'Wǒ shì xuésheng.', translationKo: '나는 학생입니다.' },
+      { chinese: '他是老师。', pinyin: 'Tā shì lǎoshī.', translationKo: '그는 선생님입니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“나는 한국 사람입니다.”에 가장 자연스러운 문장은?',
+      choices: ['我是韩国人。', '我很韩国人。', '我有韩国人。'],
+      answer: '我是韩国人。',
+      explanation: '신분이나 국적을 말할 때는 A + 是 + B 구조를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
     id: 'hsk1-bu',
     level: 1,
-    title: '不 (bù) 부정문',
+    title: '不 부정문',
     pattern: '不 + 동사/형용사',
-    explanation: "'不'는 동사나 형용사 앞에 쓰여 부정을 나타냅니다. '是'나 일반 동사를 부정할 때 쓰이며, '有'의 부정은 '没'를 사용합니다.",
+    summary: '현재나 습관, 일반적인 상태를 부정할 때 씁니다.',
+    explanation: '不는 동사나 형용사 앞에 놓아 “~하지 않다”, “~이 아니다”를 나타냅니다.',
+    usage: '좋아하지 않다, 바쁘지 않다, 가지 않다처럼 평소 상태나 의지를 말할 때 자주 씁니다.',
+    commonMistake: '완료된 과거 행동을 부정할 때는 不가 아니라 没를 쓰는 경우가 많습니다.',
+    tags: ['negative', 'basic'],
     examples: [
-      { chinese: '我不是老师。', translation: '나는 선생님이 아닙니다.' },
-      { chinese: '他不吃米饭。', translation: '그는 밥을 먹지 않습니다.' }
-    ]
-  },
-  {
+      { chinese: '我不喝咖啡。', pinyin: 'Wǒ bù hē kāfēi.', translationKo: '나는 커피를 마시지 않습니다.' },
+      { chinese: '今天不冷。', pinyin: 'Jīntiān bù lěng.', translationKo: '오늘은 춥지 않습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我___喜欢这个菜。',
+      answer: '不',
+      explanation: '좋아하지 않는다는 일반적 부정이므로 不를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
     id: 'hsk1-ma',
     level: 1,
-    title: '吗 (ma) 의문문',
+    title: '吗 의문문',
     pattern: '평서문 + 吗？',
-    explanation: "평서문 끝에 '吗'를 붙여 '~입니까?', '~하나요?'라는 의문문을 만듭니다.",
+    summary: '예/아니오로 대답할 수 있는 질문을 만듭니다.',
+    explanation: '평서문 끝에 吗를 붙이면 상대에게 사실 여부를 묻는 질문이 됩니다.',
+    usage: '상대의 상태, 직업, 선호, 가능 여부를 간단히 확인할 때 씁니다.',
+    commonMistake: '이미 谁, 什么, 哪儿 같은 의문사가 있으면 보통 吗를 붙이지 않습니다.',
+    tags: ['question', 'yes no'],
     examples: [
-      { chinese: '你是学生吗？', translation: '당신은 학생입니까?' },
-      { chinese: '你爱我吗？', translation: '당신은 나를 사랑하나요?' }
-    ]
-  },
+      { chinese: '你是老师吗？', pinyin: 'Nǐ shì lǎoshī ma?', translationKo: '당신은 선생님입니까?' },
+      { chinese: '你喜欢茶吗？', pinyin: 'Nǐ xǐhuan chá ma?', translationKo: '당신은 차를 좋아하나요?' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“너는 학생이니?”를 만드는 알맞은 끝말은?',
+      choices: ['吗', '很', '的'],
+      answer: '吗',
+      explanation: '예/아니오 질문은 평서문 끝에 吗를 붙입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-you',
+    level: 1,
+    title: '有 소유와 존재',
+    pattern: 'A + 有 + B',
+    summary: '무언가를 가지고 있거나, 어떤 곳에 존재함을 말합니다.',
+    explanation: '有는 “가지고 있다”와 “있다”를 모두 나타낼 수 있습니다.',
+    usage: '가족 수, 물건, 시간, 장소 안의 존재를 말할 때 유용합니다.',
+    commonMistake: '有의 부정은 不有가 아니라 没有입니다.',
+    tags: ['possession', 'existence'],
+    examples: [
+      { chinese: '我有一个妹妹。', pinyin: 'Wǒ yǒu yí ge mèimei.', translationKo: '나는 여동생이 한 명 있습니다.' },
+      { chinese: '桌子上有书。', pinyin: 'Zhuōzi shàng yǒu shū.', translationKo: '책상 위에 책이 있습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '有의 부정형으로 맞는 것은?',
+      choices: ['没有', '不有', '没是'],
+      answer: '没有',
+      explanation: '有를 부정할 때는 没有를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-hen-adj',
+    level: 1,
+    title: '很 + 형용사',
+    pattern: '주어 + 很 + 형용사',
+    summary: '상태나 성질을 자연스럽게 설명하는 기본 구조입니다.',
+    explanation: '중국어 형용사 문장에서는 很이 “매우”보다 문장을 자연스럽게 만드는 역할을 자주 합니다.',
+    usage: '바쁘다, 좋다, 춥다, 어렵다처럼 상태를 말할 때 씁니다.',
+    commonMistake: '“我是忙”처럼 是를 넣지 않습니다.',
+    tags: ['adjective', 'state'],
+    examples: [
+      { chinese: '我很忙。', pinyin: 'Wǒ hěn máng.', translationKo: '나는 바쁩니다.' },
+      { chinese: '这个菜很好吃。', pinyin: 'Zhège cài hěn hǎochī.', translationKo: '이 음식은 맛있습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“오늘은 덥다.”에 가장 자연스러운 문장은?',
+      choices: ['今天很热。', '今天是热。', '今天有热。'],
+      answer: '今天很热。',
+      explanation: '형용사 热 앞에는 很을 두어 자연스럽게 말합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-zai-place',
+    level: 1,
+    title: '在 + 장소',
+    pattern: '주어 + 在 + 장소',
+    summary: '사람이나 물건이 어디에 있는지 말합니다.',
+    explanation: '在는 위치를 나타내며, 뒤에 학교, 집, 책상 위 같은 장소가 옵니다.',
+    usage: '위치 확인, 약속 장소, 물건 위치를 말할 때 자주 씁니다.',
+    commonMistake: '장소가 아니라 소유를 말할 때는 在가 아니라 有를 씁니다.',
+    tags: ['location', 'place'],
+    examples: [
+      { chinese: '我在学校。', pinyin: 'Wǒ zài xuéxiào.', translationKo: '나는 학교에 있습니다.' },
+      { chinese: '妈妈在家。', pinyin: 'Māma zài jiā.', translationKo: '엄마는 집에 있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我___图书馆。',
+      answer: '在',
+      explanation: '위치를 말하므로 在를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-de',
+    level: 1,
+    title: '的 소유 표현',
+    pattern: 'A + 的 + B',
+    summary: 'A의 B처럼 소유나 관계를 나타냅니다.',
+    explanation: '的는 앞말이 뒷말을 꾸미게 만들어 소유, 관계, 속성을 연결합니다.',
+    usage: '내 책, 선생님의 이름, 친구의 집처럼 관계를 말할 때 씁니다.',
+    commonMistake: '가족이나 아주 가까운 관계에서는 的를 생략하는 경우도 있습니다.',
+    tags: ['modifier', 'possession'],
+    examples: [
+      { chinese: '这是我的书。', pinyin: 'Zhè shì wǒ de shū.', translationKo: '이것은 내 책입니다.' },
+      { chinese: '老师的名字很好听。', pinyin: 'Lǎoshī de míngzi hěn hǎotīng.', translationKo: '선생님의 이름은 듣기 좋습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“내 친구”에 맞는 표현은?',
+      choices: ['我的朋友', '我在朋友', '我是朋友'],
+      answer: '我的朋友',
+      explanation: '소유 관계는 的를 사용합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-time-before-verb',
+    level: 1,
+    title: '시간 표현 위치',
+    pattern: '주어 + 시간 + 동사',
+    summary: '중국어에서 시간 표현은 보통 동사 앞에 옵니다.',
+    explanation: '오늘, 내일, 몇 시 같은 시간 표현은 주어 뒤 또는 문장 맨 앞에 놓습니다.',
+    usage: '일정, 약속, 공부 시간, 식사 시간을 말할 때 중요합니다.',
+    commonMistake: '영어처럼 시간을 문장 끝에 두면 중국어답지 않게 들릴 수 있습니다.',
+    tags: ['time', 'word order'],
+    examples: [
+      { chinese: '我明天去学校。', pinyin: 'Wǒ míngtiān qù xuéxiào.', translationKo: '나는 내일 학교에 갑니다.' },
+      { chinese: '我们今天学习汉语。', pinyin: 'Wǒmen jīntiān xuéxí Hànyǔ.', translationKo: '우리는 오늘 중국어를 공부합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '가장 자연스러운 어순은?',
+      choices: ['我今天喝茶。', '我喝茶今天。', '喝茶我今天。'],
+      answer: '我今天喝茶。',
+      explanation: '시간 표현 今天은 보통 동사 앞에 옵니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-question-words',
+    level: 1,
+    title: '의문사 질문',
+    pattern: '의문사 위치 = 대답 위치',
+    summary: '谁, 什么, 哪儿 같은 의문사는 대답이 들어갈 자리에 둡니다.',
+    explanation: '중국어 의문사는 문장 맨 앞으로 옮기지 않고, 필요한 자리에 그대로 놓습니다.',
+    usage: '누구, 무엇, 어디를 묻는 가장 기본적인 질문 구조입니다.',
+    commonMistake: '의문사가 있는 문장 끝에 吗를 또 붙이지 않습니다.',
+    tags: ['question', 'word order'],
+    examples: [
+      { chinese: '你是谁？', pinyin: 'Nǐ shì shéi?', translationKo: '당신은 누구입니까?' },
+      { chinese: '你去哪儿？', pinyin: 'Nǐ qù nǎr?', translationKo: '당신은 어디에 가나요?' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“너는 어디에 가니?”에 맞는 문장은?',
+      choices: ['你去哪儿？', '哪儿你去吗？', '你去哪儿吗？'],
+      answer: '你去哪儿？',
+      explanation: '의문사 哪儿는 대답 위치에 두고 吗를 붙이지 않습니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk1-measure-ge',
+    level: 1,
+    title: '수량 + 个',
+    pattern: '숫자 + 个 + 명사',
+    summary: '个는 가장 기본적이고 널리 쓰이는 양사입니다.',
+    explanation: '중국어에서 숫자와 명사 사이에는 보통 양사가 필요합니다. 个는 사람이나 일반 명사에 많이 씁니다.',
+    usage: '한 사람, 세 학생, 두 사과처럼 초급 수량 표현에 자주 등장합니다.',
+    commonMistake: '숫자 바로 뒤에 명사를 붙이는 한국어식 어순을 피해야 합니다.',
+    tags: ['measure word', 'quantity'],
+    examples: [
+      { chinese: '我有一个朋友。', pinyin: 'Wǒ yǒu yí ge péngyou.', translationKo: '나는 친구가 한 명 있습니다.' },
+      { chinese: '这里有三个学生。', pinyin: 'Zhèlǐ yǒu sān ge xuésheng.', translationKo: '여기에 학생 세 명이 있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我有一___朋友。',
+      answer: '个',
+      explanation: '朋友 앞에는 기본 양사 个를 사용할 수 있습니다.',
+    },
+  }),
 
-  // HSK 2
-  {
-    id: 'hsk2-le',
+  makeGrammarPoint({
+    id: 'hsk2-le-completion',
     level: 2,
-    title: '了 (le) 완료태',
+    title: '了 완료',
     pattern: '동사 + 了',
-    explanation: "동사 뒤에 쓰여 동작이나 상태가 이미 완료되었음을 나타냅니다.",
+    summary: '동작이 이미 일어났거나 완료되었음을 나타냅니다.',
+    explanation: '了는 동사 뒤에 붙어 동작의 완료를 표시합니다. 과거 시제 자체라기보다 완료된 사건에 가깝습니다.',
+    usage: '밥을 먹었다, 책을 샀다, 영화를 봤다처럼 끝난 일을 말할 때 씁니다.',
+    commonMistake: '모든 과거 문장에 了를 붙이는 것은 아닙니다. 습관이나 상태에는 보통 붙이지 않습니다.',
+    tags: ['aspect', 'completion'],
     examples: [
-      { chinese: '我吃米饭了。', translation: '나는 밥을 먹었습니다.' },
-      { chinese: '他买了一本书。', translation: '그는 책을 한 권 샀습니다.' }
-    ]
-  },
-  {
-    id: 'hsk2-zai',
+      { chinese: '我吃了饭。', pinyin: 'Wǒ chī le fàn.', translationKo: '나는 밥을 먹었습니다.' },
+      { chinese: '他买了一本书。', pinyin: 'Tā mǎi le yì běn shū.', translationKo: '그는 책 한 권을 샀습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我看___电影。',
+      answer: '了',
+      explanation: '이미 본 영화를 말하므로 동사 뒤에 了를 붙입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-mei-you',
     level: 2,
-    title: '在 (zài) 진행태',
+    title: '没(有) 부정',
+    pattern: '没(有) + 동사',
+    summary: '과거에 하지 않았거나 아직 일어나지 않은 일을 부정합니다.',
+    explanation: '没은 완료되지 않은 동작을 부정할 때 씁니다. 有와 함께 没有로도 자주 말합니다.',
+    usage: '아직 안 먹었다, 가지 않았다, 보지 못했다처럼 완료 부정에 중요합니다.',
+    commonMistake: '“먹지 않았다”는 不吃了보다 没吃가 자연스러운 경우가 많습니다.',
+    tags: ['negative', 'completion'],
+    examples: [
+      { chinese: '我没吃早饭。', pinyin: 'Wǒ méi chī zǎofàn.', translationKo: '나는 아침을 먹지 않았습니다.' },
+      { chinese: '他没有去学校。', pinyin: 'Tā méiyǒu qù xuéxiào.', translationKo: '그는 학교에 가지 않았습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“나는 아직 숙제를 하지 않았다.”에 맞는 부정은?',
+      choices: ['没做作业', '不做作业', '是做作业'],
+      answer: '没做作业',
+      explanation: '아직 완료되지 않은 동작은 没으로 부정합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-zai-progress',
+    level: 2,
+    title: '在 진행',
     pattern: '在 + 동사',
-    explanation: "동사 앞에 쓰여 동작이 현재 진행 중임을 나타냅니다. '~하고 있는 중이다'로 해석합니다.",
+    summary: '지금 어떤 동작이 진행 중임을 나타냅니다.',
+    explanation: '동사 앞의 在는 “~하고 있는 중”이라는 뜻을 만듭니다.',
+    usage: '전화하고 있다, 공부하고 있다, 밥 먹고 있다처럼 현재 진행을 말할 때 씁니다.',
+    commonMistake: '위치의 在와 진행의 在를 문맥으로 구분해야 합니다.',
+    tags: ['progressive', 'aspect'],
     examples: [
-      { chinese: '我在看书。', translation: '나는 책을 읽고 있습니다.' },
-      { chinese: '他在睡觉。', translation: '그는 자고 있습니다.' }
-    ]
-  },
-  {
-    id: 'hsk2-bi',
+      { chinese: '我在看书。', pinyin: 'Wǒ zài kàn shū.', translationKo: '나는 책을 읽고 있습니다.' },
+      { chinese: '他们在吃饭。', pinyin: 'Tāmen zài chī fàn.', translationKo: '그들은 밥을 먹고 있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '她___打电话。',
+      answer: '在',
+      explanation: '전화하는 동작이 진행 중이므로 在를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-guo-experience',
     level: 2,
-    title: '比 (bǐ) 비교문',
-    pattern: 'A + 比 + B + 형용사',
-    explanation: "두 대상을 비교할 때 사용합니다. 'A가 B보다 ~하다'라는 뜻입니다.",
-    examples: [
-      { chinese: '哥哥比我高。', translation: '형이 나보다 큽니다.' },
-      { chinese: '今天比昨天热。', translation: '오늘이 어제보다 덥습니다.' }
-    ]
-  },
-  {
-    id: 'hsk2-guo',
-    level: 2,
-    title: '过 (guò) 경험태',
+    title: '过 경험',
     pattern: '동사 + 过',
-    explanation: "동사 뒤에 쓰여 과거의 경험을 나타냅니다. '~한 적이 있다'로 해석합니다.",
+    summary: '과거에 어떤 경험을 해 본 적이 있음을 말합니다.',
+    explanation: '过는 “~해 본 적이 있다”라는 경험을 나타냅니다.',
+    usage: '가 본 적, 먹어 본 적, 본 적 같은 경험 질문과 답에 자주 씁니다.',
+    commonMistake: '완료 了와 경험 过는 다릅니다. 过는 경험 여부에 초점이 있습니다.',
+    tags: ['experience', 'aspect'],
     examples: [
-      { chinese: '我去过中国。', translation: '나는 중국에 가본 적이 있습니다.' },
-      { chinese: '我看过这本书。', translation: '나는 이 책을 본 적이 있습니다.' }
-    ]
-  },
+      { chinese: '我去过中国。', pinyin: 'Wǒ qù guo Zhōngguó.', translationKo: '나는 중국에 가 본 적이 있습니다.' },
+      { chinese: '你吃过这个菜吗？', pinyin: 'Nǐ chī guo zhège cài ma?', translationKo: '너는 이 음식을 먹어 본 적이 있니?' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '경험을 나타내는 말은?',
+      choices: ['过', '很', '个'],
+      answer: '过',
+      explanation: '동사 뒤의 过는 경험을 나타냅니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-bi-comparison',
+    level: 2,
+    title: '比 비교문',
+    pattern: 'A + 比 + B + 형용사',
+    summary: 'A가 B보다 더 어떠한지 비교합니다.',
+    explanation: '比 뒤에 비교 대상을 두고, 마지막에 비교되는 성질을 말합니다.',
+    usage: '더 크다, 더 빠르다, 더 비싸다처럼 차이를 말할 때 씁니다.',
+    commonMistake: '比 문장에서는 보통 很을 형용사 앞에 붙이지 않습니다.',
+    tags: ['comparison'],
+    examples: [
+      { chinese: '今天比昨天冷。', pinyin: 'Jīntiān bǐ zuótiān lěng.', translationKo: '오늘은 어제보다 춥습니다.' },
+      { chinese: '我比他高。', pinyin: 'Wǒ bǐ tā gāo.', translationKo: '나는 그보다 키가 큽니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“이 책은 저 책보다 비싸다.”에 맞는 구조는?',
+      choices: ['这本书比那本书贵。', '这本书很比那本书贵。', '这本书贵比那本书。'],
+      answer: '这本书比那本书贵。',
+      explanation: 'A + 比 + B + 형용사 어순을 사용합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-yao-future',
+    level: 2,
+    title: '要 예정과 의지',
+    pattern: '要 + 동사',
+    summary: '앞으로 하려는 일이나 필요를 말합니다.',
+    explanation: '要는 “~하려고 하다”, “~해야 한다”처럼 예정, 의지, 필요를 나타냅니다.',
+    usage: '내일 할 일, 여행 계획, 주문할 것 등을 말할 때 사용합니다.',
+    commonMistake: '단순히 좋아한다는 뜻에는 要가 아니라 想이나 喜欢이 더 자연스럽습니다.',
+    tags: ['future', 'modal'],
+    examples: [
+      { chinese: '我明天要去北京。', pinyin: 'Wǒ míngtiān yào qù Běijīng.', translationKo: '나는 내일 베이징에 가려고 합니다.' },
+      { chinese: '你要喝什么？', pinyin: 'Nǐ yào hē shénme?', translationKo: '너는 무엇을 마실래?' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我明天___考试。',
+      answer: '要',
+      explanation: '앞으로 있을 일을 말하므로 要를 사용할 수 있습니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-jiu-cai',
+    level: 2,
+    title: '就와 才',
+    pattern: '시간 + 就/才 + 동사',
+    summary: '빠름은 就, 늦음은 才로 느낌을 더합니다.',
+    explanation: '就는 예상보다 빠름, 才는 예상보다 늦음을 나타냅니다.',
+    usage: '일찍 도착했다, 늦게 끝났다처럼 시간에 대한 느낌을 말할 때 씁니다.',
+    commonMistake: '둘 다 단순 시간 표시가 아니라 말하는 사람의 평가가 담깁니다.',
+    tags: ['time', 'adverb'],
+    examples: [
+      { chinese: '他七点就来了。', pinyin: 'Tā qī diǎn jiù lái le.', translationKo: '그는 7시에 벌써 왔습니다.' },
+      { chinese: '我十点才起床。', pinyin: 'Wǒ shí diǎn cái qǐchuáng.', translationKo: '나는 10시에야 일어났습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '예상보다 늦은 느낌을 주는 말은?',
+      choices: ['才', '就', '的'],
+      answer: '才',
+      explanation: '才는 예상보다 늦거나 적다는 느낌을 줍니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-de-degree',
+    level: 2,
+    title: '정도보어 得',
+    pattern: '동사 + 得 + 형용사',
+    summary: '동작을 얼마나 잘하거나 어떻게 하는지 설명합니다.',
+    explanation: '得 뒤에는 동작의 정도나 상태를 설명하는 말이 옵니다.',
+    usage: '말을 잘한다, 빨리 달린다, 글씨를 예쁘게 쓴다처럼 동작 평가에 중요합니다.',
+    commonMistake: '得, 的, 地는 발음이 같아도 역할이 다릅니다.',
+    tags: ['complement', 'degree'],
+    examples: [
+      { chinese: '他说得很好。', pinyin: 'Tā shuō de hěn hǎo.', translationKo: '그는 말을 아주 잘합니다.' },
+      { chinese: '你写得很快。', pinyin: 'Nǐ xiě de hěn kuài.', translationKo: '너는 아주 빨리 씁니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '他说___很好。',
+      answer: '得',
+      explanation: '동작 说의 정도를 설명하므로 得를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-give-gei',
+    level: 2,
+    title: '给 + 사람 + 물건',
+    pattern: '给 + 사람 + 명사',
+    summary: '누구에게 무엇을 주는지 말합니다.',
+    explanation: '给는 “~에게 주다” 또는 “~에게”라는 방향을 나타냅니다.',
+    usage: '선물, 전화, 메시지, 도움을 주고받는 표현에 자주 씁니다.',
+    commonMistake: '받는 사람을 빼면 누구에게 주는지 불분명해질 수 있습니다.',
+    tags: ['preposition', 'recipient'],
+    examples: [
+      { chinese: '我给妈妈打电话。', pinyin: 'Wǒ gěi māma dǎ diànhuà.', translationKo: '나는 엄마에게 전화합니다.' },
+      { chinese: '他给我一本书。', pinyin: 'Tā gěi wǒ yì běn shū.', translationKo: '그는 나에게 책 한 권을 줍니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“나에게 전화하다”에 맞는 표현은?',
+      choices: ['给我打电话', '在我打电话', '比我打电话'],
+      answer: '给我打电话',
+      explanation: '전화의 대상은 给 + 사람으로 표시할 수 있습니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk2-li-place',
+    level: 2,
+    title: '방위사 上/下/里',
+    pattern: '명사 + 上/下/里',
+    summary: '위, 아래, 안 같은 위치를 말합니다.',
+    explanation: '방위사는 명사 뒤에 붙어 더 구체적인 위치를 나타냅니다.',
+    usage: '책상 위, 의자 아래, 가방 안처럼 물건 위치를 설명할 때 필수입니다.',
+    commonMistake: '장소 명사 뒤에 바로 붙는 경우가 많으므로 어순에 주의합니다.',
+    tags: ['location', 'direction word'],
+    examples: [
+      { chinese: '书在桌子上。', pinyin: 'Shū zài zhuōzi shàng.', translationKo: '책은 책상 위에 있습니다.' },
+      { chinese: '手机在包里。', pinyin: 'Shǒujī zài bāo lǐ.', translationKo: '휴대폰은 가방 안에 있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '书在桌子___。',
+      answer: '上',
+      explanation: '책상 위는 桌子上이라고 말합니다.',
+    },
+  }),
 
-  // HSK 3
-  {
+  makeGrammarPoint({
     id: 'hsk3-ba',
     level: 3,
-    title: '把 (bǎ) 처치문',
-    pattern: '주어 + 把 + 목적어 + 동사 + 기타성분',
-    explanation: "목적어를 동사 앞으로 끌어내어, 그 목적어에 어떤 동작을 가해 결과를 발생시킴을 강조합니다.",
+    title: '把 처치문',
+    pattern: '주어 + 把 + 목적어 + 동사 + 결과',
+    summary: '목적어가 어떻게 처리되었는지 강조합니다.',
+    explanation: '把 문장은 목적어를 동사 앞에 놓고, 그 목적어에 생긴 결과를 뒤에서 말합니다.',
+    usage: '문을 열다, 책을 놓다, 숙제를 끝내다처럼 처리 결과가 분명한 동작에 씁니다.',
+    commonMistake: '把 뒤에는 보통 단순 동사만 오지 않고 결과나 위치가 함께 와야 자연스럽습니다.',
+    tags: ['ba construction', 'result'],
     examples: [
-      { chinese: '我把书放下了。', translation: '나는 책을 내려놓았습니다.' },
-      { chinese: '他把苹果吃了。', translation: '그는 사과를 먹어버렸습니다.' }
-    ]
-  },
-  {
+      { chinese: '我把书放在桌子上。', pinyin: 'Wǒ bǎ shū fàng zài zhuōzi shàng.', translationKo: '나는 책을 책상 위에 놓았습니다.' },
+      { chinese: '请把门关上。', pinyin: 'Qǐng bǎ mén guān shang.', translationKo: '문을 닫아 주세요.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '把 문장으로 가장 자연스러운 것은?',
+      choices: ['我把作业做完了。', '我把作业做。', '我作业把做完了。'],
+      answer: '我把作业做完了。',
+      explanation: '把 뒤의 목적어에는 보통 처리 결과 做完了가 함께 옵니다.',
+    },
+  }),
+  makeGrammarPoint({
     id: 'hsk3-bei',
     level: 3,
-    title: '被 (bèi) 피동문',
-    pattern: '주어 + 被 + 행위자 + 동사 + 기타성분',
-    explanation: "주어가 어떤 동작을 당함을 나타냅니다. 행위자는 생략될 수 있습니다.",
+    title: '被 피동문',
+    pattern: '주어 + 被 + 행위자 + 동사',
+    summary: '주어가 어떤 동작을 당했음을 말합니다.',
+    explanation: '被 문장은 누가 당했는지, 어떤 일이 일어났는지를 강조합니다.',
+    usage: '물건을 잃어버리거나, 칭찬받거나, 영향을 받은 상황에 자주 씁니다.',
+    commonMistake: '피동문도 결과가 분명할 때 더 자연스럽습니다.',
+    tags: ['passive'],
     examples: [
-      { chinese: '苹果被他吃了。', translation: '사과는 그에 의해 먹혔습니다.' },
-      { chinese: '衣服被洗了。', translation: '옷이 세탁되었습니다.' }
-    ]
-  },
-  {
-    id: 'hsk3-suiran',
+      { chinese: '我的手机被他拿走了。', pinyin: 'Wǒ de shǒujī bèi tā názǒu le.', translationKo: '내 휴대폰은 그가 가져갔습니다.' },
+      { chinese: '这个问题被解决了。', pinyin: 'Zhège wèntí bèi jiějué le.', translationKo: '이 문제는 해결되었습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我的包___别人拿走了。',
+      answer: '被',
+      explanation: '가방이 다른 사람에게 가져가진 상황이므로 被를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-ruguo-jiu',
     level: 3,
-    title: '虽然... 但是... (양보 구문)',
-    pattern: '虽然 + 상황1, 但是 + 상황2',
-    explanation: "'비록 ~이지만, 그러나 ~하다'라는 뜻으로 상반되는 두 가지 상황을 연결하는 접속사입니다.",
+    title: '如果...就...',
+    pattern: '如果 + 조건, 就 + 결과',
+    summary: '조건과 결과를 연결합니다.',
+    explanation: '만약 어떤 조건이 성립하면 어떤 결과가 생긴다는 뜻입니다.',
+    usage: '계획, 약속, 가능성, 조언을 말할 때 자주 씁니다.',
+    commonMistake: '就는 생략 가능하지만, 초급에서는 함께 쓰면 구조가 더 분명합니다.',
+    tags: ['condition'],
     examples: [
-      { chinese: '虽然下雨，但是我们去爬山。', translation: '비록 비가 오지만, 우리는 등산을 갑니다.' },
-      { chinese: '虽然他很累，但是他很高兴。', translation: '비록 그는 피곤하지만, 그는 매우 기쁩니다.' }
-    ]
-  },
-  {
+      { chinese: '如果明天下雨，我们就不去。', pinyin: 'Rúguǒ míngtiān xià yǔ, wǒmen jiù bú qù.', translationKo: '내일 비가 오면 우리는 가지 않습니다.' },
+      { chinese: '如果你有时间，就给我打电话。', pinyin: 'Rúguǒ nǐ yǒu shíjiān, jiù gěi wǒ dǎ diànhuà.', translationKo: '시간이 있으면 나에게 전화해 주세요.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '조건문에 어울리는 연결은?',
+      choices: ['如果...就...', '因为...所以...', '虽然...但是...'],
+      answer: '如果...就...',
+      explanation: '조건과 결과는 如果...就...로 연결합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-suiran-danshi',
+    level: 3,
+    title: '虽然...但是...',
+    pattern: '虽然 + 사실, 但是 + 반대 내용',
+    summary: '양보와 반전을 연결합니다.',
+    explanation: '앞 절의 내용은 인정하지만, 뒤 절에서 반대되거나 예상과 다른 내용을 말합니다.',
+    usage: '힘들지만 계속한다, 비싸지만 좋다처럼 균형 있는 판단에 씁니다.',
+    commonMistake: '한국어처럼 “하지만”만 쓰는 것보다 虽然과 但是를 짝으로 익히면 안정적입니다.',
+    tags: ['contrast', 'concession'],
+    examples: [
+      { chinese: '虽然今天很忙，但是我很高兴。', pinyin: 'Suīrán jīntiān hěn máng, dànshì wǒ hěn gāoxìng.', translationKo: '오늘은 바쁘지만 나는 기쁩니다.' },
+      { chinese: '虽然这个菜有点儿辣，但是很好吃。', pinyin: 'Suīrán zhège cài yǒudiǎnr là, dànshì hěn hǎochī.', translationKo: '이 음식은 조금 맵지만 맛있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___天气很冷，但是他还去跑步。',
+      answer: '虽然',
+      explanation: '앞 절을 인정하고 뒤에서 반전하므로 虽然을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
     id: 'hsk3-yuelaiyue',
     level: 3,
-    title: '越来越 (yùeláiyùe) 점층 구문',
+    title: '越来越',
     pattern: '越来越 + 형용사/심리동사',
-    explanation: "시간이 지남에 따라 정도가 심해짐을 나타냅니다. '점점 더 ~해지다'로 해석합니다.",
+    summary: '상태가 점점 더 변해 가는 것을 말합니다.',
+    explanation: '시간이 지나며 정도가 증가하거나 강해지는 변화를 표현합니다.',
+    usage: '날씨, 실력, 관심, 가격 변화 등을 말할 때 자주 씁니다.',
+    commonMistake: '순간적인 변화보다 점진적인 변화에 어울립니다.',
+    tags: ['change', 'degree'],
     examples: [
-      { chinese: '天气越来越热。', translation: '날씨가 점점 더워집니다.' },
-      { chinese: '他越来越胖。', translation: '그는 점점 뚱뚱해집니다.' }
-    ]
-  },
-  {
-    id: 'hsk3-ruguo',
+      { chinese: '天气越来越热。', pinyin: 'Tiānqì yuèláiyuè rè.', translationKo: '날씨가 점점 더워집니다.' },
+      { chinese: '我越来越喜欢中文。', pinyin: 'Wǒ yuèláiyuè xǐhuan Zhōngwén.', translationKo: '나는 중국어를 점점 더 좋아하게 됩니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“점점 더 바빠지다”에 맞는 표현은?',
+      choices: ['越来越忙', '一边忙', '比较忙了'],
+      answer: '越来越忙',
+      explanation: '정도가 점점 강해질 때 越来越를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-yi-bian',
     level: 3,
-    title: '如果... 就... (가정 구문)',
-    pattern: '如果 + 가정, (주어) + 就 + 결과',
-    explanation: "'만약 ~라면, 곧 ~하다'라는 뜻으로 가정을 나타내는 접속사입니다.",
+    title: '一边...一边...',
+    pattern: '一边 + 동작1 + 一边 + 동작2',
+    summary: '두 동작이 동시에 일어남을 말합니다.',
+    explanation: '같은 시간에 두 행동을 함께 하는 상황을 표현합니다.',
+    usage: '음악을 들으며 공부하다, 걸으며 말하다 같은 동시 행동에 좋습니다.',
+    commonMistake: '두 동작은 동시에 가능한 행동이어야 자연스럽습니다.',
+    tags: ['simultaneous'],
     examples: [
-      { chinese: '如果明天下雨，我们就不去。', translation: '만약 내일 비가 온다면, 우리는 가지 않겠습니다.' },
-      { chinese: '如果你有钱，就买吧。', translation: '만약 당신에게 돈이 있다면, 사세요.' }
-    ]
-  },
-  // HSK 4
-  {
-    id: 'hsk4-suiran',
-    level: 4,
-    title: '虽然... 但是... (suīrán... dànshì...) 양보 구문',
-    pattern: '虽然 + A, 但是 + B',
-    explanation: "'비록 ~하지만, 그러나 ~하다'라는 뜻으로 상반되는 두 가지 상황을 연결합니다.",
+      { chinese: '他一边听音乐一边做作业。', pinyin: 'Tā yìbiān tīng yīnyuè yìbiān zuò zuòyè.', translationKo: '그는 음악을 들으면서 숙제를 합니다.' },
+      { chinese: '我们一边走一边聊天。', pinyin: 'Wǒmen yìbiān zǒu yìbiān liáotiān.', translationKo: '우리는 걸으면서 이야기를 나눕니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '他一边吃饭___看电视。',
+      answer: '一边',
+      explanation: '두 동시 동작은 一边...一边...로 연결합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-v-de-result',
+    level: 3,
+    title: '결과보어',
+    pattern: '동사 + 完/懂/到/好',
+    summary: '동작의 결과가 어떻게 되었는지 말합니다.',
+    explanation: '동사 뒤에 결과보어를 붙이면 끝남, 이해함, 도달함, 완성됨 같은 결과를 나타냅니다.',
+    usage: '다 했다, 알아들었다, 찾았다처럼 결과가 중요한 문장에 씁니다.',
+    commonMistake: '결과보어는 동작 자체보다 “결과”에 초점이 있습니다.',
+    tags: ['result complement'],
     examples: [
-      { chinese: '虽然他很累，但是还在工作。', translation: '그는 비록 피곤하지만, 여전히 일하고 있습니다.' },
-      { chinese: '虽然下雨了，但是我们还是去了。', translation: '비록 비가 왔지만, 우리는 그래도 갔습니다.' }
-    ]
-  },
-  {
-    id: 'hsk4-budan',
+      { chinese: '我听懂了。', pinyin: 'Wǒ tīng dǒng le.', translationKo: '나는 알아들었습니다.' },
+      { chinese: '作业做完了。', pinyin: 'Zuòyè zuò wán le.', translationKo: '숙제를 다 했습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“알아듣다”의 결과보어 표현은?',
+      choices: ['听懂', '听很', '听在'],
+      answer: '听懂',
+      explanation: '懂은 이해했다는 결과를 나타냅니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-direction',
+    level: 3,
+    title: '방향보어 来/去',
+    pattern: '동사 + 来/去',
+    summary: '동작의 방향이 말하는 사람 쪽인지 멀어지는 쪽인지 나타냅니다.',
+    explanation: '来는 말하는 사람 쪽으로, 去는 멀어지는 방향으로 움직임을 나타냅니다.',
+    usage: '들어오다, 나가다, 가져오다, 가져가다 같은 이동 표현에 중요합니다.',
+    commonMistake: '한국어 뜻만 보지 말고 말하는 사람 기준 방향을 생각해야 합니다.',
+    tags: ['direction complement'],
+    examples: [
+      { chinese: '请进来。', pinyin: 'Qǐng jìn lai.', translationKo: '들어오세요.' },
+      { chinese: '他拿走了我的书。', pinyin: 'Tā názǒu le wǒ de shū.', translationKo: '그가 내 책을 가져갔습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '말하는 사람 쪽으로 들어오는 표현은?',
+      choices: ['进来', '进去', '出去'],
+      answer: '进来',
+      explanation: '来는 말하는 사람 쪽 방향입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-dui',
+    level: 3,
+    title: '对...感兴趣',
+    pattern: '对 + 대상 + 感兴趣',
+    summary: '~에 관심이 있다는 표현입니다.',
+    explanation: '관심, 태도, 의견의 대상을 말할 때 对 뒤에 대상을 둡니다.',
+    usage: '관심사, 학습 동기, 취미를 말할 때 자연스럽습니다.',
+    commonMistake: '喜欢처럼 바로 목적어를 붙이는 구조와 다릅니다.',
+    tags: ['preposition', 'attitude'],
+    examples: [
+      { chinese: '我对中国文化感兴趣。', pinyin: 'Wǒ duì Zhōngguó wénhuà gǎn xìngqù.', translationKo: '나는 중국 문화에 관심이 있습니다.' },
+      { chinese: '他对历史很感兴趣。', pinyin: 'Tā duì lìshǐ hěn gǎn xìngqù.', translationKo: '그는 역사에 매우 관심이 있습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '我___中文电影感兴趣。',
+      answer: '对',
+      explanation: '관심의 대상은 对 뒤에 둡니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk3-chu-le',
+    level: 3,
+    title: '除了...以外',
+    pattern: '除了 + A + 以外, B',
+    summary: 'A를 제외하거나 포함해 다른 내용을 말합니다.',
+    explanation: '문맥에 따라 “A를 제외하고” 또는 “A뿐만 아니라”의 뜻이 됩니다.',
+    usage: '범위, 예외, 추가 대상을 말할 때 유용합니다.',
+    commonMistake: '뒤 문장의 의미를 보고 제외인지 포함인지 판단해야 합니다.',
+    tags: ['range', 'exception'],
+    examples: [
+      { chinese: '除了汉语以外，我还学英语。', pinyin: 'Chúle Hànyǔ yǐwài, wǒ hái xué Yīngyǔ.', translationKo: '중국어 외에도 나는 영어를 배웁니다.' },
+      { chinese: '除了他以外，大家都来了。', pinyin: 'Chúle tā yǐwài, dàjiā dōu lái le.', translationKo: '그를 제외하고 모두 왔습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“중국어 외에도 영어를 배운다”에 어울리는 구조는?',
+      choices: ['除了汉语以外，还学英语', '因为汉语，所以英语', '把汉语学英语'],
+      answer: '除了汉语以外，还学英语',
+      explanation: '추가 범위를 말할 때 除了...以外와 还를 함께 씁니다.',
+    },
+  }),
+
+  makeGrammarPoint({
+    id: 'hsk4-budan-erqie',
     level: 4,
-    title: '不但... 而且... (búdàn... érqiě...) 점층 구문',
+    title: '不但...而且...',
     pattern: '不但 + A, 而且 + B',
-    explanation: "'~일 뿐만 아니라, 게다가 ~하다'라는 뜻으로 점층적인 관계를 나타냅니다.",
+    summary: '두 장점을 누적해 강조합니다.',
+    explanation: 'A일 뿐만 아니라 B이기도 하다는 뜻으로, 뒤 절에서 더 중요한 내용을 말합니다.',
+    usage: '사람의 장점, 상품 특징, 경험 평가를 말할 때 좋습니다.',
+    commonMistake: '而且 뒤에는 앞보다 더해지는 정보가 와야 자연스럽습니다.',
+    tags: ['addition', 'emphasis'],
     examples: [
-      { chinese: '他不但聪明，而且很努力。', translation: '그는 똑똑할 뿐만 아니라, 게다가 매우 노력합니다.' },
-      { chinese: '这道菜不但好看，而且好吃。', translation: '이 요리는 보기 좋을 뿐만 아니라, 맛도 좋습니다.' }
-    ]
-  },
+      { chinese: '他不但聪明，而且很努力。', pinyin: 'Tā búdàn cōngming, érqiě hěn nǔlì.', translationKo: '그는 똑똑할 뿐만 아니라 매우 노력합니다.' },
+      { chinese: '这个房间不但干净，而且很安静。', pinyin: 'Zhège fángjiān búdàn gānjìng, érqiě hěn ānjìng.', translationKo: '이 방은 깨끗할 뿐만 아니라 조용합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '누적 강조에 맞는 연결은?',
+      choices: ['不但...而且...', '虽然...但是...', '如果...就...'],
+      answer: '不但...而且...',
+      explanation: '두 가지 장점을 더해 말할 때 不但...而且...를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-zhiyao-jiu',
+    level: 4,
+    title: '只要...就...',
+    pattern: '只要 + 조건, 就 + 결과',
+    summary: '충분 조건을 나타냅니다.',
+    explanation: '어떤 조건만 충족되면 결과가 가능하다는 뜻입니다.',
+    usage: '조언, 격려, 규칙, 방법 설명에 자주 씁니다.',
+    commonMistake: '如果보다 조건이 더 충분하고 확실한 느낌입니다.',
+    tags: ['condition'],
+    examples: [
+      { chinese: '只要你努力，就一定会进步。', pinyin: 'Zhǐyào nǐ nǔlì, jiù yídìng huì jìnbù.', translationKo: '네가 노력하기만 하면 반드시 발전할 것입니다.' },
+      { chinese: '只要有时间，我就去看你。', pinyin: 'Zhǐyào yǒu shíjiān, wǒ jiù qù kàn nǐ.', translationKo: '시간만 있으면 나는 너를 보러 갈게.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___你认真复习，就能考好。',
+      answer: '只要',
+      explanation: '충분 조건을 말하므로 只要를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-youyu-yinci',
+    level: 4,
+    title: '由于...因此...',
+    pattern: '由于 + 원인, 因此 + 결과',
+    summary: '비교적 문어적인 원인과 결과 연결입니다.',
+    explanation: '由于는 원인을, 因此는 그 결과를 나타냅니다.',
+    usage: '공지, 설명문, 보고서 느낌의 문장에서 자주 보입니다.',
+    commonMistake: '일상 대화에서는 因为...所以...가 더 자연스러운 경우도 많습니다.',
+    tags: ['cause result', 'formal'],
+    examples: [
+      { chinese: '由于天气不好，因此活动取消了。', pinyin: 'Yóuyú tiānqì bù hǎo, yīncǐ huódòng qǔxiāo le.', translationKo: '날씨가 좋지 않아서 행사가 취소되었습니다.' },
+      { chinese: '由于时间不够，我们决定明天再谈。', pinyin: 'Yóuyú shíjiān bú gòu, wǒmen juédìng míngtiān zài tán.', translationKo: '시간이 부족해서 우리는 내일 다시 이야기하기로 했습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '공식적인 원인-결과 연결로 가장 알맞은 것은?',
+      choices: ['由于...因此...', '一边...一边...', '越...越...'],
+      answer: '由于...因此...',
+      explanation: '由于...因此...는 문어적인 원인과 결과를 연결합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-ba-advanced',
+    level: 4,
+    title: '把 + 목적어 + 동사 + 成/到/在',
+    pattern: '把 + 목적어 + 동사 + 결과',
+    summary: '목적어의 변화 결과나 위치 결과를 구체적으로 말합니다.',
+    explanation: 'HSK4에서는 把 문장이 더 다양한 결과보어와 함께 나옵니다.',
+    usage: '문서를 수정하다, 물건을 어디에 두다, A를 B로 바꾸다처럼 처리 결과를 강조합니다.',
+    commonMistake: '把 문장은 “무엇을 어떻게 했는지” 결과가 있어야 안정적입니다.',
+    tags: ['ba construction', 'result'],
+    examples: [
+      { chinese: '请把这句话翻译成中文。', pinyin: 'Qǐng bǎ zhè jù huà fānyì chéng Zhōngwén.', translationKo: '이 문장을 중국어로 번역해 주세요.' },
+      { chinese: '他把照片放在桌子上。', pinyin: 'Tā bǎ zhàopiàn fàng zài zhuōzi shàng.', translationKo: '그는 사진을 책상 위에 놓았습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '请把这个句子翻译___韩语。',
+      answer: '成',
+      explanation: 'A를 B로 바꾸는 결과는 成을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-bei-result',
+    level: 4,
+    title: '被 + 결과',
+    pattern: '주어 + 被 + 동사 + 결과',
+    summary: '어떤 대상이 영향을 받은 결과를 강조합니다.',
+    explanation: '被 문장은 단순 피동보다 결과가 있는 사건을 말할 때 더 자연스럽습니다.',
+    usage: '문제가 해결되다, 물건이 가져가졌다, 창문이 열렸다처럼 상태 변화를 말합니다.',
+    commonMistake: '행위자가 중요하지 않으면 생략할 수 있습니다.',
+    tags: ['passive', 'result'],
+    examples: [
+      { chinese: '问题已经被解决了。', pinyin: 'Wèntí yǐjīng bèi jiějué le.', translationKo: '문제는 이미 해결되었습니다.' },
+      { chinese: '门被打开了。', pinyin: 'Mén bèi dǎkāi le.', translationKo: '문이 열렸습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '피동 결과를 나타내는 문장은?',
+      choices: ['问题被解决了。', '问题把解决了。', '问题在解决了。'],
+      answer: '问题被解决了。',
+      explanation: '주어가 처리된 결과를 말하므로 被 구조가 맞습니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-yue-yue',
+    level: 4,
+    title: '越...越...',
+    pattern: '越 + 조건/동작, 越 + 결과',
+    summary: '~할수록 점점 더 ~하다는 뜻입니다.',
+    explanation: '앞의 변화가 커질수록 뒤의 변화도 함께 커지는 관계를 나타냅니다.',
+    usage: '공부할수록 재미있다, 생각할수록 어렵다처럼 점진적 관계에 씁니다.',
+    commonMistake: '越来越는 단일 변화, 越...越...는 두 변화의 관계를 말합니다.',
+    tags: ['correlative', 'degree'],
+    examples: [
+      { chinese: '我越学越觉得有意思。', pinyin: 'Wǒ yuè xué yuè juéde yǒu yìsi.', translationKo: '배울수록 재미있다고 느낍니다.' },
+      { chinese: '这件事越想越复杂。', pinyin: 'Zhè jiàn shì yuè xiǎng yuè fùzá.', translationKo: '이 일은 생각할수록 복잡합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“볼수록 좋아진다”에 맞는 구조는?',
+      choices: ['越看越喜欢', '越来越看喜欢', '一边看一边喜欢了'],
+      answer: '越看越喜欢',
+      explanation: '두 변화의 관계는 越...越...로 말합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-lian-dou',
+    level: 4,
+    title: '连...都/也...',
+    pattern: '连 + 극단 예시 + 都/也 + 결과',
+    summary: '극단적인 예를 들어 정도를 강조합니다.',
+    explanation: '“심지어 A조차도 B하다”라는 의미로 놀라움이나 강한 강조를 나타냅니다.',
+    usage: '너무 바쁘다, 너무 어렵다, 모두가 안다는 식의 강조에 씁니다.',
+    commonMistake: '连 뒤에는 보통 강조하고 싶은 극단적 예시가 옵니다.',
+    tags: ['emphasis'],
+    examples: [
+      { chinese: '他忙得连饭都没吃。', pinyin: 'Tā máng de lián fàn dōu méi chī.', translationKo: '그는 너무 바빠서 밥조차 먹지 못했습니다.' },
+      { chinese: '这个字连老师也不会写。', pinyin: 'Zhège zì lián lǎoshī yě bú huì xiě.', translationKo: '이 글자는 선생님조차 쓸 줄 모릅니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '他忙得___水都没喝。',
+      answer: '连',
+      explanation: '극단 예시를 들어 강조하므로 连을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-yi-bian-mian',
+    level: 4,
+    title: '以免',
+    pattern: '행동, 以免 + 나쁜 결과',
+    summary: '좋지 않은 결과를 피하기 위해 어떤 행동을 한다는 뜻입니다.',
+    explanation: '以免 뒤에는 피하고 싶은 상황이 옵니다.',
+    usage: '늦지 않도록, 잊지 않도록, 실수하지 않도록 조심할 때 씁니다.',
+    commonMistake: '긍정적인 목적에는 为了가 더 자연스럽습니다.',
+    tags: ['purpose', 'avoidance'],
+    examples: [
+      { chinese: '早点儿出门，以免迟到。', pinyin: 'Zǎodiǎnr chūmén, yǐmiǎn chídào.', translationKo: '늦지 않도록 좀 일찍 나가세요.' },
+      { chinese: '请再检查一遍，以免出错。', pinyin: 'Qǐng zài jiǎnchá yí biàn, yǐmiǎn chūcuò.', translationKo: '실수하지 않도록 다시 한 번 확인해 주세요.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '나쁜 결과를 피한다는 뜻의 표현은?',
+      choices: ['以免', '而且', '因此'],
+      answer: '以免',
+      explanation: '以免은 피하고 싶은 결과를 뒤에 둡니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-zai-shuo',
+    level: 4,
+    title: '再说',
+    pattern: '문장1, 再说 + 이유2',
+    summary: '추가 이유를 덧붙일 때 씁니다.',
+    explanation: '앞에서 말한 이유에 더해 다른 이유를 추가합니다.',
+    usage: '설득, 거절, 판단 이유를 자연스럽게 덧붙일 때 유용합니다.',
+    commonMistake: '“다시 말하다”의 再说와 문맥으로 구분합니다.',
+    tags: ['discourse', 'reason'],
+    examples: [
+      { chinese: '今天太晚了，再说我也很累。', pinyin: 'Jīntiān tài wǎn le, zàishuō wǒ yě hěn lèi.', translationKo: '오늘은 너무 늦었고, 게다가 나도 매우 피곤합니다.' },
+      { chinese: '我们先别买，再说价格也不便宜。', pinyin: 'Wǒmen xiān bié mǎi, zàishuō jiàgé yě bù piányi.', translationKo: '우선 사지 맙시다. 게다가 가격도 싸지 않습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '추가 이유를 덧붙이는 표현은?',
+      choices: ['再说', '只要', '被'],
+      answer: '再说',
+      explanation: '再说은 앞 이유에 다른 이유를 더할 때 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk4-jishi-ye',
+    level: 4,
+    title: '即使...也...',
+    pattern: '即使 + 가정, 也 + 결과',
+    summary: '그런 상황이라도 결과가 바뀌지 않음을 말합니다.',
+    explanation: '어려운 조건이나 극단적인 가정을 제시하고도 뒤 결과가 유지됨을 나타냅니다.',
+    usage: '의지, 원칙, 조건에 상관없는 결정을 말할 때 씁니다.',
+    commonMistake: '가능성이 있는 조건은 如果가 더 일반적입니다.',
+    tags: ['concession', 'hypothesis'],
+    examples: [
+      { chinese: '即使很忙，我也会继续学习。', pinyin: 'Jíshǐ hěn máng, wǒ yě huì jìxù xuéxí.', translationKo: '아무리 바빠도 나는 계속 공부할 것입니다.' },
+      { chinese: '即使下雨，他也要去。', pinyin: 'Jíshǐ xià yǔ, tā yě yào qù.', translationKo: '비가 와도 그는 가려고 합니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___很难，我也想试试。',
+      answer: '即使',
+      explanation: '불리한 가정에도 결과가 유지되므로 即使를 씁니다.',
+    },
+  }),
 
-  // HSK 5
-  {
-    id: 'hsk5-lian-dou',
+  makeGrammarPoint({
+    id: 'hsk5-bushi-er-shi',
     level: 5,
-    title: '连... 都/也... (심지어 구문)',
-    pattern: '连 + A + 都/也 + B',
-    explanation: "'심지어 A조차도 B하다'라는 뜻으로, 극단적인 예시를 들어 어떤 사실을 강조할 때 사용합니다.",
+    title: '不是...而是...',
+    pattern: '不是 + A, 而是 + B',
+    summary: 'A가 아니라 B라고 바로잡는 구조입니다.',
+    explanation: '잘못된 판단을 부정하고 진짜 내용을 뒤에서 제시합니다.',
+    usage: '오해를 정정하거나 핵심 원인을 분명히 할 때 씁니다.',
+    commonMistake: '두 내용은 서로 대립하거나 대체 관계여야 자연스럽습니다.',
+    tags: ['correction', 'contrast'],
     examples: [
-      { chinese: '他太忙了，连吃饭的时间都没有。', translation: '그는 너무 바빠서 심지어 밥 먹을 시간조차 없습니다.' },
-      { chinese: '这个问题连小孩子都知道。', translation: '이 문제는 심지어 어린아이조차도 압니다.' }
-    ]
-  },
-  {
-    id: 'hsk5-jishi',
+      { chinese: '问题不是价格，而是质量。', pinyin: 'Wèntí bú shì jiàgé, ér shì zhìliàng.', translationKo: '문제는 가격이 아니라 품질입니다.' },
+      { chinese: '他不是不想去，而是没有时间。', pinyin: 'Tā bú shì bù xiǎng qù, ér shì méiyǒu shíjiān.', translationKo: '그는 가고 싶지 않은 것이 아니라 시간이 없습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '오해를 바로잡는 구조는?',
+      choices: ['不是...而是...', '不但...而且...', '一边...一边...'],
+      answer: '不是...而是...',
+      explanation: 'A가 아니라 B라고 정정할 때 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-yuqi-buru',
     level: 5,
-    title: '即使... 也... (가정 양보 구문)',
-    pattern: '即使 + A, 也 + B',
-    explanation: "'설령 A하더라도, 역시 B하다'라는 뜻으로, 가상의 상황을 제시하고 그 상황이 결과에 영향을 미치지 않음을 나타냅니다.",
-    examples: [
-      { chinese: '即使下大雨，我也要去。', translation: '설령 큰 비가 내리더라도, 나는 갈 것입니다.' },
-      { chinese: '即使你不想听，我也要说。', translation: '설령 당신이 듣고 싶지 않더라도, 나는 말할 것입니다.' }
-    ]
-  },
-  {
-    id: 'hsk5-wulun',
-    level: 5,
-    title: '无论... 都/也... (조건 양보 구문)',
-    pattern: '无论 + 조건/의문문, 都/也 + 결과',
-    explanation: "'~를 막론하고 모두 ~하다'라는 뜻으로, 어떠한 조건 하에서도 동일한 결과가 나타남을 강조합니다.",
-    examples: [
-      { chinese: '无论遇到什么困难，他都不放弃。', translation: '어떤 어려움을 만나든 막론하고, 그는 포기하지 않습니다.' },
-      { chinese: '无论你去哪里，我都会支持你。', translation: '당신이 어디를 가든, 나는 모두 당신을 지지할 것입니다.' }
-    ]
-  },
-  {
-    id: 'hsk5-ningke',
-    level: 5,
-    title: '宁可... 也不... (선택 구문)',
-    pattern: '宁可 + A, 也不 + B',
-    explanation: "두 가지 불리한 상황 중에서 '차라리 A할지언정, B하지는 않겠다'는 강한 의지를 나타냅니다.",
-    examples: [
-      { chinese: '我宁可穷，也不做坏事。', translation: '나는 차라리 가난할지언정, 나쁜 일은 하지 않겠습니다.' },
-      { chinese: '他宁可走路，也不坐那辆车。', translation: '그는 차라리 걸어갈지언정, 그 차는 타지 않겠습니다.' }
-    ]
-  },
-  {
-    id: 'hsk5-jiran',
-    level: 5,
-    title: '既然... 就... (기정 사실 구문)',
-    pattern: '既然 + 기정사실, 就 + 결론/제안',
-    explanation: "'기왕 이렇게 된 바에야 ~하다'라는 뜻으로, 이미 발생하거나 알려진 사실을 전제로 결론이나 제안을 이끌어냅니다.",
-    examples: [
-      { chinese: '既然你来了，就吃完饭再走吧。', translation: '기왕 당신이 왔으니, 밥을 다 먹고 가세요.' },
-      { chinese: '既然大家都没意见，那就这么办吧。', translation: '모두 의견이 없으시니, 그럼 이렇게 처리합시다.' }
-    ]
-  },
-
-  // HSK 6
-  {
-    id: 'hsk6-napa',
-    level: 6,
-    title: '哪怕... 也/都... (가정 양보 구문)',
-    pattern: '哪怕 + A, 也/都 + B',
-    explanation: "'설령 A하더라도, 역시 B하다'라는 뜻으로, '即使... 也...'와 비슷하지만 극단적인 가정을 더 강하게 나타냅니다.",
-    examples: [
-      { chinese: '哪怕只有一线希望，我也要试试。', translation: '설령 일말의 희망밖에 없을지라도, 나는 시도해 볼 것입니다.' },
-      { chinese: '哪怕再困难，我们也要完成任务。', translation: '설령 아무리 어렵더라도, 우리는 임무를 완수해야 합니다.' }
-    ]
-  },
-  {
-    id: 'hsk6-fanshi',
-    level: 6,
-    title: '凡是... 都... (무조건 구문)',
-    pattern: '凡是 + 특정 범위/조건, (주어) + 都 + 결론',
-    explanation: "'무릇 ~한 것은 모두 ~하다'라는 뜻으로, 어떤 범위 내의 모든 예외 없는 상황을 강조할 때 사용됩니다.",
-    examples: [
-      { chinese: '凡是认识他的人，都说他是个好人。', translation: '그를 아는 사람은 무릇 모두 그를 좋은 사람이라고 말합니다.' },
-      { chinese: '凡是不符合规定的产品，都不能出厂。', translation: '규정에 부합하지 않는 제품은 무릇 모두 출고될 수 없습니다.' }
-    ]
-  },
-  {
-    id: 'hsk6-yuqi',
-    level: 6,
-    title: '与其... 不如... (비교 선택 구문)',
+    title: '与其...不如...',
     pattern: '与其 + A, 不如 + B',
-    explanation: "'A하느니 차라리 B하는 것이 낫다'라는 뜻으로, 두 가지 상황을 비교한 후 뒤의 상황(B)을 선택함을 확고하게 나타냅니다.",
+    summary: 'A보다는 B가 낫다는 선택 구조입니다.',
+    explanation: '두 선택지를 비교해 더 나은 방법을 제안합니다.',
+    usage: '조언, 판단, 효율적인 선택을 말할 때 자주 씁니다.',
+    commonMistake: '뒤의 不如가 실제 추천하는 선택입니다.',
+    tags: ['choice', 'comparison'],
     examples: [
-      { chinese: '与其在家里睡觉，不如出去运动。', translation: '집에서 잠을 자느니 차라리 나가서 운동하는 것이 낫습니다.' },
-      { chinese: '与其抱怨，不如想办法解决。', translation: '불평하느니 차라리 해결 방법을 생각하는 것이 낫습니다.' }
-    ]
-  },
-  {
-    id: 'hsk6-chufei',
+      { chinese: '与其抱怨，不如马上行动。', pinyin: 'Yǔqí bàoyuàn, bùrú mǎshàng xíngdòng.', translationKo: '불평하기보다 바로 행동하는 것이 낫습니다.' },
+      { chinese: '与其一个人想，不如和大家讨论。', pinyin: 'Yǔqí yí ge rén xiǎng, bùrú hé dàjiā tǎolùn.', translationKo: '혼자 생각하기보다 모두와 토론하는 것이 낫습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '与其等别人帮忙，___自己先试试。',
+      answer: '不如',
+      explanation: '더 나은 선택은 不如 뒤에 옵니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-wulun-dou',
+    level: 5,
+    title: '无论...都...',
+    pattern: '无论 + 조건, 都 + 결과',
+    summary: '어떤 조건에서도 결과가 같음을 말합니다.',
+    explanation: '조건이 어떻게 바뀌어도 뒤의 결과나 태도는 변하지 않습니다.',
+    usage: '원칙, 약속, 반복되는 결과를 강조할 때 씁니다.',
+    commonMistake: '뒤에는 보통 都나 也가 함께 옵니다.',
+    tags: ['condition', 'emphasis'],
+    examples: [
+      { chinese: '无论遇到什么困难，他都不会放弃。', pinyin: 'Wúlùn yùdào shénme kùnnan, tā dōu bú huì fàngqì.', translationKo: '어떤 어려움을 만나도 그는 포기하지 않을 것입니다.' },
+      { chinese: '无论你去哪儿，我都支持你。', pinyin: 'Wúlùn nǐ qù nǎr, wǒ dōu zhīchí nǐ.', translationKo: '네가 어디에 가든 나는 너를 지지합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '조건이 달라도 결과가 같음을 나타내는 구조는?',
+      choices: ['无论...都...', '不是...而是...', '由于...因此...'],
+      answer: '无论...都...',
+      explanation: '无论...都...는 조건과 무관한 동일 결과를 말합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-jiu-suan-ye',
+    level: 5,
+    title: '就算...也...',
+    pattern: '就算 + 가정, 也 + 결과',
+    summary: '설령 그렇다 해도 결과가 변하지 않음을 말합니다.',
+    explanation: '극단적인 가정을 제시하고 뒤에서 변하지 않는 태도나 결과를 말합니다.',
+    usage: '의지, 결심, 원칙을 강하게 말할 때 자연스럽습니다.',
+    commonMistake: '即使와 비슷하지만 더 구어적이고 강한 느낌이 있습니다.',
+    tags: ['concession', 'hypothesis'],
+    examples: [
+      { chinese: '就算失败，我也不会后悔。', pinyin: 'Jiùsuàn shībài, wǒ yě bú huì hòuhuǐ.', translationKo: '설령 실패해도 나는 후회하지 않을 것입니다.' },
+      { chinese: '就算很累，他也坚持练习。', pinyin: 'Jiùsuàn hěn lèi, tā yě jiānchí liànxí.', translationKo: '아무리 피곤해도 그는 연습을 계속합니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___下雨，我们也按时出发。',
+      answer: '就算',
+      explanation: '불리한 가정에도 결과가 유지되므로 就算을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-ningke-ye-bu',
+    level: 5,
+    title: '宁可...也不...',
+    pattern: '宁可 + A, 也不 + B',
+    summary: '차라리 A하더라도 B는 하지 않겠다는 강한 선택입니다.',
+    explanation: '두 선택 중 하나를 강하게 거부하고 다른 쪽을 택할 때 씁니다.',
+    usage: '원칙, 고집, 가치 판단을 표현할 때 자주 등장합니다.',
+    commonMistake: '뒤의 也不가 거부하는 선택입니다.',
+    tags: ['choice', 'preference'],
+    examples: [
+      { chinese: '我宁可走路，也不坐那辆车。', pinyin: 'Wǒ nìngkě zǒulù, yě bú zuò nà liàng chē.', translationKo: '나는 차라리 걸어갈지언정 그 차는 타지 않겠습니다.' },
+      { chinese: '他宁可少赚钱，也不降低质量。', pinyin: 'Tā nìngkě shǎo zhuànqián, yě bù jiàngdī zhìliàng.', translationKo: '그는 돈을 덜 벌지언정 품질을 낮추지는 않습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '강한 선택과 거부를 나타내는 구조는?',
+      choices: ['宁可...也不...', '越...越...', '由于...因此...'],
+      answer: '宁可...也不...',
+      explanation: '宁可...也不...는 차라리 A하고 B는 하지 않겠다는 뜻입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-ji-ran-jiu',
+    level: 5,
+    title: '既然...就...',
+    pattern: '既然 + 이미 정해진 사실, 就 + 판단',
+    summary: '이미 그런 상황이라면 이렇게 하자는 구조입니다.',
+    explanation: '이미 알고 있거나 정해진 사실을 바탕으로 결론이나 제안을 냅니다.',
+    usage: '회의, 조언, 결정 상황에서 매우 실용적입니다.',
+    commonMistake: '조건이 아니라 이미 성립된 사실을 전제로 합니다.',
+    tags: ['reasoning', 'decision'],
+    examples: [
+      { chinese: '既然你来了，就一起吃饭吧。', pinyin: 'Jìrán nǐ lái le, jiù yìqǐ chī fàn ba.', translationKo: '네가 온 김에 같이 밥 먹자.' },
+      { chinese: '既然大家都同意，我们就开始吧。', pinyin: 'Jìrán dàjiā dōu tóngyì, wǒmen jiù kāishǐ ba.', translationKo: '모두 동의했으니 시작합시다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___已经决定了，就不要再犹豫。',
+      answer: '既然',
+      explanation: '이미 정해진 사실을 전제로 결론을 내므로 既然을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-bu-mian',
+    level: 5,
+    title: '难免',
+    pattern: '难免 + 동사/형용사',
+    summary: '피하기 어렵거나 어쩔 수 없음을 말합니다.',
+    explanation: '어떤 상황에서 특정 문제가 생기는 것이 자연스럽다는 뜻입니다.',
+    usage: '실수, 긴장, 오해, 충돌처럼 완전히 피하기 어려운 상황에 씁니다.',
+    commonMistake: '부정적인 상황이나 아쉬운 결과에 주로 어울립니다.',
+    tags: ['evaluation'],
+    examples: [
+      { chinese: '第一次上台难免紧张。', pinyin: 'Dì yī cì shàngtái nánmiǎn jǐnzhāng.', translationKo: '처음 무대에 오르면 긴장하기 마련입니다.' },
+      { chinese: '工作太多，难免会出错。', pinyin: 'Gōngzuò tài duō, nánmiǎn huì chūcuò.', translationKo: '일이 너무 많으면 실수하기 마련입니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“피하기 어렵다/그럴 수밖에 없다”에 가까운 표현은?',
+      choices: ['难免', '因此', '再说'],
+      answer: '难免',
+      explanation: '难免은 어떤 결과가 피하기 어렵다는 뜻입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-you-ci-ke-jian',
+    level: 5,
+    title: '由此可见',
+    pattern: '사실/근거 + 由此可见 + 결론',
+    summary: '앞 근거를 바탕으로 결론을 제시합니다.',
+    explanation: '“이로부터 알 수 있듯이”라는 뜻으로, 설명문과 주장문에 자주 나옵니다.',
+    usage: '독해, 발표, 작문에서 결론을 논리적으로 연결할 때 유용합니다.',
+    commonMistake: '개인 감정보다는 근거가 있는 결론에 잘 어울립니다.',
+    tags: ['discourse', 'conclusion'],
+    examples: [
+      { chinese: '他每天练习，由此可见他很努力。', pinyin: 'Tā měitiān liànxí, yóucǐ kějiàn tā hěn nǔlì.', translationKo: '그는 매일 연습합니다. 이로 보아 그는 매우 노력합니다.' },
+      { chinese: '报名人数增加了，由此可见这个课程很受欢迎。', pinyin: 'Bàomíng rénshù zēngjiā le, yóucǐ kějiàn zhège kèchéng hěn shòu huānyíng.', translationKo: '신청 인원이 늘었습니다. 이로 보아 이 수업은 인기가 많습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '근거에서 결론을 이끌 때 쓰는 표현은?',
+      choices: ['由此可见', '一边一边', '只要就'],
+      answer: '由此可见',
+      explanation: '由此可见은 앞 근거를 바탕으로 결론을 말합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-jin-guan',
+    level: 5,
+    title: '尽管...还是...',
+    pattern: '尽管 + 어려움, 还是 + 결과',
+    summary: '어려움에도 불구하고 결과가 유지됨을 말합니다.',
+    explanation: '앞 조건이 불리하지만 뒤의 행동이나 결과가 계속됨을 강조합니다.',
+    usage: '노력, 결심, 지속 행동을 표현할 때 자주 씁니다.',
+    commonMistake: '虽然...但是보다 약간 더 문어적이고 단단한 느낌입니다.',
+    tags: ['concession'],
+    examples: [
+      { chinese: '尽管很累，他还是完成了任务。', pinyin: 'Jǐnguǎn hěn lèi, tā háishi wánchéng le rènwu.', translationKo: '매우 피곤했지만 그는 임무를 완수했습니다.' },
+      { chinese: '尽管价格高，很多人还是愿意买。', pinyin: 'Jǐnguǎn jiàgé gāo, hěn duō rén háishi yuànyì mǎi.', translationKo: '가격이 높지만 많은 사람이 여전히 사고 싶어 합니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___天气不好，他还是来了。',
+      answer: '尽管',
+      explanation: '불리한 상황에도 결과가 유지되므로 尽管을 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk5-zhi-suo-yi',
+    level: 5,
+    title: '之所以...是因为...',
+    pattern: '之所以 + 결과, 是因为 + 원인',
+    summary: '결과를 먼저 말하고 원인을 강조합니다.',
+    explanation: '어떤 일이 그렇게 된 핵심 이유를 뒤에서 분명히 밝힙니다.',
+    usage: '분석, 설명, 논리적 답변에서 많이 쓰입니다.',
+    commonMistake: '因为...所以...보다 원인 강조가 더 강합니다.',
+    tags: ['cause result', 'emphasis'],
+    examples: [
+      { chinese: '他之所以成功，是因为一直努力。', pinyin: 'Tā zhīsuǒyǐ chénggōng, shì yīnwèi yìzhí nǔlì.', translationKo: '그가 성공한 것은 계속 노력했기 때문입니다.' },
+      { chinese: '我之所以迟到，是因为路上堵车。', pinyin: 'Wǒ zhīsuǒyǐ chídào, shì yīnwèi lùshang dǔchē.', translationKo: '내가 늦은 것은 길이 막혔기 때문입니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '원인을 강조해 설명하는 구조는?',
+      choices: ['之所以...是因为...', '不是...而是...', '无论...都...'],
+      answer: '之所以...是因为...',
+      explanation: '결과 뒤에 핵심 원인을 강조할 때 씁니다.',
+    },
+  }),
+
+  makeGrammarPoint({
+    id: 'hsk6-napa-ye',
     level: 6,
-    title: '除非... 才/否则... (유일 조건 구문)',
-    pattern: '除非 + 유일한 조건, 才/否则 + 결과',
-    explanation: "'~해야만 비로소 ~하다' 또는 '~하지 않으면 안 된다'라는 뜻으로, 어떤 일이 발생하기 위한 유일하고 필수적인 조건을 나타냅니다.",
+    title: '哪怕...也...',
+    pattern: '哪怕 + 극단 가정, 也 + 결과',
+    summary: '아무리 극단적인 상황이어도 결과가 변하지 않음을 말합니다.',
+    explanation: '即使보다 더 강한 양보 표현으로, 의지나 원칙을 강조합니다.',
+    usage: '강한 결심, 가치관, 양보 조건을 말할 때 쓰입니다.',
+    commonMistake: '일상 초급 조건문에는 너무 강하게 들릴 수 있습니다.',
+    tags: ['concession', 'advanced'],
     examples: [
-      { chinese: '除非你亲自去，他才会答应。', translation: '당신이 직접 가야만, 비로소 그가 승낙할 것입니다.' },
-      { chinese: '除非马上出发，否则我们会迟到的。', translation: '당장 출발하지 않으면, 우리는 지각할 것입니다.' }
-    ]
-  },
-  {
-    id: 'hsk6-guran',
+      { chinese: '哪怕只有一点希望，我也不会放弃。', pinyin: 'Nǎpà zhǐyǒu yìdiǎn xīwàng, wǒ yě bú huì fàngqì.', translationKo: '희망이 조금뿐이라도 나는 포기하지 않을 것입니다.' },
+      { chinese: '哪怕没人理解，他也坚持自己的选择。', pinyin: 'Nǎpà méi rén lǐjiě, tā yě jiānchí zìjǐ de xuǎnzé.', translationKo: '아무도 이해하지 못해도 그는 자신의 선택을 고수합니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___只有一次机会，我也要试试。',
+      answer: '哪怕',
+      explanation: '극단적인 양보 가정이므로 哪怕를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-fan-er',
     level: 6,
-    title: '固然... 但是/也... (부분 인정 구문)',
-    pattern: 'A + 固然 + 인정하는 점, 但是/也要 + B',
-    explanation: "'물론 ~하긴 하지만, 그러나 ~하다'라는 뜻으로, 앞의 사실을 인정하면서도 뒤의 내용이 더 중요하거나 다른 측면이 있음을 강조합니다.",
+    title: '反而',
+    pattern: '예상과 반대 결과 + 反而',
+    summary: '예상과 달리 오히려 반대 결과가 나타남을 말합니다.',
+    explanation: '앞 상황에서 예상되는 결과와 다른 방향의 결과를 강조합니다.',
+    usage: '비판, 분석, 놀라운 결과를 말할 때 자주 쓰입니다.',
+    commonMistake: '단순 반대가 아니라 “예상과 다른 결과”라는 느낌이 중요합니다.',
+    tags: ['contrast', 'unexpected'],
     examples: [
-      { chinese: '赚钱固然重要，但是健康更重要。', translation: '돈을 버는 것도 물론 중요하지만, 건강이 더 중요합니다.' },
-      { chinese: '这种方法固然好，也存在一些风险。', translation: '이 방법이 물론 좋기는 하지만, 일부 위험도 존재합니다.' }
-    ]
-  }
+      { chinese: '他没有生气，反而笑了。', pinyin: 'Tā méiyǒu shēngqì, fǎn ér xiào le.', translationKo: '그는 화내지 않고 오히려 웃었습니다.' },
+      { chinese: '休息以后，我反而更累了。', pinyin: 'Xiūxi yǐhòu, wǒ fǎn ér gèng lèi le.', translationKo: '쉬고 나서 나는 오히려 더 피곤해졌습니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '예상과 반대되는 결과를 강조하는 말은?',
+      choices: ['反而', '因此', '无论'],
+      answer: '反而',
+      explanation: '反而는 예상과 다른 반대 결과를 강조합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-fan-shi',
+    level: 6,
+    title: '凡是...都...',
+    pattern: '凡是 + 범위, 都 + 공통 결과',
+    summary: '어떤 범위 안의 모든 경우에 적용됨을 말합니다.',
+    explanation: '규칙, 원칙, 일반화를 말할 때 쓰는 문어적 표현입니다.',
+    usage: '공지, 규정, 논리적 설명에 잘 어울립니다.',
+    commonMistake: '일상 대화에서는 所有...都...가 더 쉬운 표현입니다.',
+    tags: ['generalization', 'formal'],
+    examples: [
+      { chinese: '凡是参加会议的人，都要提前报名。', pinyin: 'Fánshì cānjiā huìyì de rén, dōu yào tíqián bàomíng.', translationKo: '회의에 참가하는 사람은 모두 미리 신청해야 합니다.' },
+      { chinese: '凡是认真练习的人，都会有所提高。', pinyin: 'Fánshì rènzhēn liànxí de rén, dōu huì yǒu suǒ tígāo.', translationKo: '진지하게 연습하는 사람은 모두 향상이 있을 것입니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___报名的人，都要带身份证。',
+      answer: '凡是',
+      explanation: '범위 전체에 적용되는 규칙이므로 凡是를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-chu-fei-cai',
+    level: 6,
+    title: '除非...才...',
+    pattern: '除非 + 유일 조건, 才 + 가능 결과',
+    summary: '오직 그 조건에서만 결과가 가능함을 말합니다.',
+    explanation: '필요 조건을 강하게 제시하며, 조건 없이는 결과가 어렵다는 뜻입니다.',
+    usage: '규칙, 제한, 강한 조건을 말할 때 자주 쓰입니다.',
+    commonMistake: '只要는 충분 조건, 除非는 유일하거나 필요한 조건에 가깝습니다.',
+    tags: ['condition', 'restriction'],
+    examples: [
+      { chinese: '除非你亲自去，才可能解决这个问题。', pinyin: 'Chúfēi nǐ qīnzì qù, cái kěnéng jiějué zhège wèntí.', translationKo: '네가 직접 가야만 이 문제를 해결할 수 있을 것입니다.' },
+      { chinese: '除非天气好，我们才出发。', pinyin: 'Chúfēi tiānqì hǎo, wǒmen cái chūfā.', translationKo: '날씨가 좋아야만 우리는 출발합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '유일 조건을 나타내는 구조는?',
+      choices: ['除非...才...', '不但...而且...', '越...越...'],
+      answer: '除非...才...',
+      explanation: '除非...才...는 특정 조건에서만 가능함을 말합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-yi-zhi-yu',
+    level: 6,
+    title: '以至于',
+    pattern: '원인/정도 + 以至于 + 결과',
+    summary: '앞 상황이 너무 강해서 뒤 결과가 생김을 말합니다.',
+    explanation: '정도나 원인이 누적되어 어떤 결과에 이르렀음을 나타냅니다.',
+    usage: '문어적 설명, 결과 강조, 사회 현상 분석에 잘 어울립니다.',
+    commonMistake: '뒤에는 보통 앞 상황에서 이어진 결과가 옵니다.',
+    tags: ['result', 'degree'],
+    examples: [
+      { chinese: '他太忙了，以至于忘了吃饭。', pinyin: 'Tā tài máng le, yǐzhìyú wàng le chī fàn.', translationKo: '그는 너무 바빠서 밥 먹는 것을 잊었습니다.' },
+      { chinese: '这个问题很复杂，以至于大家讨论了很久。', pinyin: 'Zhège wèntí hěn fùzá, yǐzhìyú dàjiā tǎolùn le hěn jiǔ.', translationKo: '이 문제는 매우 복잡해서 모두가 오래 토론했습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '他太紧张了，___一句话也说不出来。',
+      answer: '以至于',
+      explanation: '긴장이라는 원인이 결과로 이어지므로 以至于를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-zhi-yu',
+    level: 6,
+    title: '至于',
+    pattern: '至于 + 새 화제',
+    summary: '새로운 화제를 꺼내거나 다른 측면으로 넘어갑니다.',
+    explanation: '앞에서 말한 내용과 관련된 다른 항목을 따로 언급할 때 씁니다.',
+    usage: '비교, 설명, 발표에서 화제를 정리하며 전환할 때 유용합니다.',
+    commonMistake: '단순 “~에 관해서”보다 화제 전환 느낌이 있습니다.',
+    tags: ['topic shift', 'discourse'],
+    examples: [
+      { chinese: '计划已经确定了，至于时间，我们明天再讨论。', pinyin: 'Jìhuà yǐjīng quèdìng le, zhìyú shíjiān, wǒmen míngtiān zài tǎolùn.', translationKo: '계획은 이미 정해졌고, 시간에 관해서는 내일 다시 논의합시다.' },
+      { chinese: '我同意这个想法，至于细节，还需要修改。', pinyin: 'Wǒ tóngyì zhège xiǎngfǎ, zhìyú xìjié, hái xūyào xiūgǎi.', translationKo: '나는 이 생각에 동의하지만, 세부사항은 아직 수정이 필요합니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '화제를 다른 측면으로 넘길 때 쓰는 표현은?',
+      choices: ['至于', '反而', '除非'],
+      answer: '至于',
+      explanation: '至于는 새 화제나 다른 측면을 꺼낼 때 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-suowei',
+    level: 6,
+    title: '所谓',
+    pattern: '所谓 + 개념/표현',
+    summary: '이른바, 소위라는 뜻으로 개념을 제시합니다.',
+    explanation: '뒤에 나오는 말이 사람들이 말하는 특정 개념임을 나타냅니다.',
+    usage: '정의, 설명, 비판적 표현에서 자주 볼 수 있습니다.',
+    commonMistake: '중립적 설명도 가능하지만 때로는 비판적 뉘앙스가 있습니다.',
+    tags: ['definition', 'formal'],
+    examples: [
+      { chinese: '所谓成功，不只是赚很多钱。', pinyin: 'Suǒwèi chénggōng, bú zhǐ shì zhuàn hěn duō qián.', translationKo: '이른바 성공은 단지 많은 돈을 버는 것만이 아닙니다.' },
+      { chinese: '所谓经验，就是从错误中学习。', pinyin: 'Suǒwèi jīngyàn, jiù shì cóng cuòwù zhōng xuéxí.', translationKo: '이른바 경험이란 실수에서 배우는 것입니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___机会，常常是给有准备的人的。',
+      answer: '所谓',
+      explanation: '개념을 제시하며 설명하므로 所谓를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-bu-jin',
+    level: 6,
+    title: '不仅仅',
+    pattern: '不仅仅 + A, 更/还 + B',
+    summary: '단지 A에 그치지 않음을 강조합니다.',
+    explanation: '범위나 의미가 A보다 더 넓다는 점을 드러냅니다.',
+    usage: '가치 판단, 분석, 주장문에서 자주 사용됩니다.',
+    commonMistake: '不但보다 더 “그 이상”이라는 느낌이 강합니다.',
+    tags: ['emphasis', 'addition'],
+    examples: [
+      { chinese: '学习语言不仅仅是背单词。', pinyin: 'Xuéxí yǔyán bù jǐnjǐn shì bèi dāncí.', translationKo: '언어 학습은 단지 단어를 외우는 것만이 아닙니다.' },
+      { chinese: '这个决定不仅仅影响现在，还会影响未来。', pinyin: 'Zhège juédìng bù jǐnjǐn yǐngxiǎng xiànzài, hái huì yǐngxiǎng wèilái.', translationKo: '이 결정은 현재뿐 아니라 미래에도 영향을 줄 것입니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“단지 ~뿐만이 아니다”를 강조하는 표현은?',
+      choices: ['不仅仅', '除非', '反而'],
+      answer: '不仅仅',
+      explanation: '不仅仅은 범위가 그 이상임을 강조합니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-cong-er',
+    level: 6,
+    title: '从而',
+    pattern: '행동/원인 + 从而 + 결과',
+    summary: '앞 행동을 통해 뒤 결과가 생김을 말합니다.',
+    explanation: '어떤 방법이나 과정이 결과로 이어짐을 문어적으로 연결합니다.',
+    usage: '보고서, 발표, 설명문에서 논리적 결과를 말할 때 자주 씁니다.',
+    commonMistake: '단순 시간 순서가 아니라 인과적 결과에 초점이 있습니다.',
+    tags: ['result', 'formal'],
+    examples: [
+      { chinese: '他不断练习，从而提高了口语水平。', pinyin: 'Tā búduàn liànxí, cóng ér tígāo le kǒuyǔ shuǐpíng.', translationKo: '그는 계속 연습함으로써 말하기 수준을 높였습니다.' },
+      { chinese: '公司改进服务，从而吸引了更多顾客。', pinyin: 'Gōngsī gǎijìn fúwù, cóng ér xīyǐn le gèng duō gùkè.', translationKo: '회사는 서비스를 개선하여 더 많은 고객을 끌어들였습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '他每天阅读，___扩大了词汇量。',
+      answer: '从而',
+      explanation: '앞 행동이 뒤 결과를 가져오므로 从而를 씁니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-wei-bi',
+    level: 6,
+    title: '未必',
+    pattern: '未必 + 동사/형용사',
+    summary: '반드시 그렇지는 않다는 신중한 판단입니다.',
+    explanation: '가능성은 있지만 확정할 수 없거나, 일반적 생각에 의문을 제기할 때 씁니다.',
+    usage: '토론, 의견 제시, 반론에서 매우 자주 보입니다.',
+    commonMistake: '완전한 부정이 아니라 “꼭 그렇지는 않다”입니다.',
+    tags: ['modality', 'evaluation'],
+    examples: [
+      { chinese: '贵的东西未必都好。', pinyin: 'Guì de dōngxi wèibì dōu hǎo.', translationKo: '비싼 물건이 반드시 다 좋은 것은 아닙니다.' },
+      { chinese: '他说的话未必是真的。', pinyin: 'Tā shuō de huà wèibì shì zhēn de.', translationKo: '그가 한 말이 반드시 사실인 것은 아닙니다.' },
+    ],
+    practice: {
+      type: 'multiple_choice',
+      prompt: '“반드시 그렇지는 않다”에 가까운 표현은?',
+      choices: ['未必', '所谓', '凡是'],
+      answer: '未必',
+      explanation: '未必는 꼭 그렇다고 볼 수 없다는 뜻입니다.',
+    },
+  }),
+  makeGrammarPoint({
+    id: 'hsk6-yi-dan',
+    level: 6,
+    title: '一旦...就...',
+    pattern: '一旦 + 상황 발생, 就 + 결과',
+    summary: '일단 어떤 일이 발생하면 곧 결과가 따른다는 뜻입니다.',
+    explanation: '조건이 성립되는 순간 뒤 결과가 거의 필연적으로 이어짐을 나타냅니다.',
+    usage: '위험, 기회, 결정, 변화의 순간을 설명할 때 유용합니다.',
+    commonMistake: '평범한 조건보다 사건 발생의 순간성이 더 강합니다.',
+    tags: ['condition', 'trigger'],
+    examples: [
+      { chinese: '一旦决定了，就不要轻易改变。', pinyin: 'Yídàn juédìng le, jiù bú yào qīngyì gǎibiàn.', translationKo: '일단 결정했으면 쉽게 바꾸지 마세요.' },
+      { chinese: '一旦错过机会，就很难再遇到。', pinyin: 'Yídàn cuòguò jīhuì, jiù hěn nán zài yùdào.', translationKo: '일단 기회를 놓치면 다시 만나기 어렵습니다.' },
+    ],
+    practice: {
+      type: 'fill_blank',
+      prompt: '___发现问题，就要马上处理。',
+      answer: '一旦',
+      explanation: '문제가 발생하는 순간 곧 처리해야 하므로 一旦이 어울립니다.',
+    },
+  }),
 ];

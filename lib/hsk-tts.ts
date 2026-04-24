@@ -65,16 +65,16 @@ const PROFILE_BLUEPRINTS: Array<Omit<HskTtsVoiceProfile, 'voice'>> = [
     label: 'Clear',
     locale: 'CN',
     gender: 'female',
-    rateOffset: -0.012,
-    pitchOffset: 0.005,
+    rateOffset: -0.006,
+    pitchOffset: 0,
   },
   {
     id: 'warm',
     label: 'Warm',
     locale: 'CN',
     gender: 'male',
-    rateOffset: -0.004,
-    pitchOffset: -0.006,
+    rateOffset: -0.003,
+    pitchOffset: 0,
   },
 ];
 
@@ -83,7 +83,7 @@ function hashString(value: string) {
 }
 
 function deterministicOffset(id: string) {
-  return ((hashString(id) % 5) - 2) * 0.004;
+  return ((hashString(id) % 5) - 2) * 0.002;
 }
 
 function numberToChinese(value: string | number): string {
@@ -257,23 +257,23 @@ export function buildHskProsodyOptions(
   override?: 'slow' | 'normal',
 ): Required<Pick<HskTtsOptions, 'lang' | 'rate' | 'pitch' | 'volume' | 'pauseMs'>> & { voice?: SpeechSynthesisVoice | null } {
   const levelBaseRate: Record<HskListeningLevel, number> = {
-    1: 0.82,
-    2: 0.86,
-    3: 0.9,
-    4: 0.93,
-    5: 0.955,
-    6: 0.975,
+    1: 0.88,
+    2: 0.9,
+    3: 0.93,
+    4: 0.955,
+    5: 0.98,
+    6: 0.995,
   };
   const skillAdjustment: Partial<Record<HskListeningSkill, number>> = {
-    tone_discrimination: -0.02,
-    number_time_listening: -0.018,
-    dictation: -0.026,
-    shadowing: -0.012,
-    similar_sound_discrimination: -0.018,
-    sequence_understanding: -0.006,
+    tone_discrimination: -0.01,
+    number_time_listening: -0.01,
+    dictation: -0.018,
+    shadowing: -0.008,
+    similar_sound_discrimination: -0.008,
+    sequence_understanding: -0.004,
   };
-  const profileAdjustment = question.speedProfile === 'slow' ? -0.014 : question.speedProfile === 'fast' ? 0.008 : 0;
-  const slowAdjustment = override === 'slow' ? -0.08 : 0;
+  const profileAdjustment = question.speedProfile === 'slow' ? -0.006 : question.speedProfile === 'fast' ? 0.004 : 0;
+  const slowAdjustment = override === 'slow' ? -0.095 : 0;
   const rate = Number((
     levelBaseRate[question.level] +
     (skillAdjustment[question.listeningSkill] ?? 0) +
@@ -286,10 +286,10 @@ export function buildHskProsodyOptions(
   return {
     voice: voice ?? profile.voice,
     lang: (voice ?? profile.voice)?.lang ?? 'zh-CN',
-    rate: Math.min(1.01, Math.max(0.72, rate)),
-    pitch: Math.min(1.03, Math.max(0.97, 1 + profile.pitchOffset)),
+    rate: Math.min(1.02, Math.max(0.78, rate)),
+    pitch: 1,
     volume: 1,
-    pauseMs: question.listeningSkill === 'dictation' || question.listeningSkill === 'shadowing' ? 540 : 390,
+    pauseMs: question.listeningSkill === 'dictation' || question.listeningSkill === 'shadowing' ? 460 : 260,
   };
 }
 
@@ -323,6 +323,16 @@ const PUNCTUATION_SPLIT_PATTERN = /(?<=[\u3002\uff01\uff1f\uff1b\uff0c.!?;,])/;
 
 export function segmentChineseForListening(text: string, question?: Pick<HskListeningQuestion, 'activityType'>) {
   const normalized = normalizeChineseForTTS(text);
+  const needsTrainingPauses = (
+    question?.activityType === 'dictation' ||
+    question?.activityType === 'shadowing' ||
+    question?.activityType === 'repeat_listening'
+  );
+
+  if (!needsTrainingPauses) {
+    return [{ text: normalized, pauseMs: 240, reason: 'natural' as const }];
+  }
+
   const segments: HskTtsSegment[] = [];
   let lastIndex = 0;
 

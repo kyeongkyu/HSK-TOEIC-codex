@@ -1,12 +1,11 @@
 'use client';
 import { useUserWords } from '@/hooks/use-user-words';
-import { hskWords } from '@/data/hsk';
-import { toeicWords } from '@/data/toeic';
 import Link from 'next/link';
 import { Star, BookOpen, Brain, CheckSquare } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { speak } from '@/lib/tts';
 import { useSettings } from '@/hooks/use-settings';
+import type { WordData } from '@/lib/srs';
 
 export default function LibraryPage() {
   const { userWords, toggleFavorite, isLoaded } = useUserWords();
@@ -14,6 +13,30 @@ export default function LibraryPage() {
   const [isMemorizeMode, setIsMemorizeMode] = useState(false);
   const [revealedWords, setRevealedWords] = useState<Record<string, boolean>>({});
   const [speakingWordId, setSpeakingWordId] = useState<string | null>(null);
+  const [wordData, setWordData] = useState<WordData[]>([]);
+  const [isWordDataLoaded, setIsWordDataLoaded] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setIsWordDataLoaded(false);
+
+    const loadWords = async () => {
+      const words = appMode === 'toeic'
+        ? (await import('@/data/toeic')).toeicWords
+        : (await import('@/data/hsk')).hskWords;
+
+      if (!isCancelled) {
+        setWordData(words);
+        setIsWordDataLoaded(true);
+      }
+    };
+
+    void loadWords();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [appMode]);
 
   const toggleReveal = (id: string) => {
     setRevealedWords(prev => ({ ...prev, [id]: !prev[id] }));
@@ -28,16 +51,16 @@ export default function LibraryPage() {
 
   const favoriteWords = useMemo(() => {
     const favoriteWordIds = new Set(Object.keys(userWords).filter(id => userWords[id]?.isFavorite));
-    let filtered = (appMode === 'toeic' ? toeicWords : hskWords).filter(w => favoriteWordIds.has(w.id));
+    let filtered = wordData.filter(w => favoriteWordIds.has(w.id));
     
     if (appMode !== 'toeic' && separateLibraryByLevel && selectedLevel !== 'all') {
       filtered = filtered.filter(w => w.level === selectedLevel);
     }
     
     return filtered;
-  }, [userWords, separateLibraryByLevel, selectedLevel, appMode]);
+  }, [userWords, separateLibraryByLevel, selectedLevel, appMode, wordData]);
 
-  if (!isLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
+  if (!isLoaded || !isWordDataLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">

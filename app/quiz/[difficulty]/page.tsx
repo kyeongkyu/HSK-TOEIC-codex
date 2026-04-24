@@ -5,7 +5,7 @@ import { hskWords } from '@/data/hsk';
 import { HSK_CATEGORIES } from '@/data/hsk-categories';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useState } from 'react';
 
 type QuizListItem = {
   id: string;
@@ -115,7 +115,7 @@ export default function QuizChapterPage() {
       <header className="pt-8 mb-10">
         <div className="flex items-center justify-between mb-2">
           <button
-            onClick={() => router.push('/quiz')}
+            onClick={() => startTransition(() => router.push('/quiz'))}
             className="p-3 -ml-3 text-black dark:text-white bg-gray-100 dark:bg-gray-800 rounded-2xl active:scale-95 transition-all"
           >
             <ArrowLeft size={20} />
@@ -142,7 +142,7 @@ export default function QuizChapterPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: Math.min(index * 0.05, 0.5) }}
-              onClick={() => router.push(`/quiz/${difficulty}/${item.id}?mode=${mode}`)}
+              onClick={() => startTransition(() => router.push(`/quiz/${difficulty}/${item.id}?mode=${mode}`))}
               className="w-full p-5 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-2xl flex items-center justify-between transition-all active:scale-95 group hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800"
             >
               <div className="flex items-center gap-5 w-full min-w-0">

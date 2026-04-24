@@ -10,6 +10,8 @@ import { speak } from '@/lib/tts';
 import { useUserWords } from '@/hooks/use-user-words';
 import { ArrowLeft, Volume2, CheckCircle2, XCircle, RefreshCcw, ChevronRight, Trophy, AlertCircle, Star, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { clampCount, getProgressPercent } from '@/lib/ui-state';
 
 type QuizState = 'answering' | 'feedback' | 'finished';
 type QuizQuestionType = 'hanzi-to-meaning' | 'meaning-to-hanzi';
@@ -26,12 +28,6 @@ function getQuizProgressStorageKey(difficulty: string, mode: string, chapterPara
 
 function getLegacyQuizProgressStorageKey(difficulty: string, chapterParam: string) {
   return `quiz-progress-${difficulty}-${chapterParam}`;
-}
-
-function clampCount(value: number, max: number) {
-  const safeValue = Number.isFinite(value) ? value : 0;
-  const safeMax = Math.max(max, 0);
-  return Math.min(Math.max(Math.round(safeValue), 0), safeMax);
 }
 
 function normalizeSavedQuizProgress(
@@ -307,8 +303,9 @@ export default function QuizPage() {
       if (!isWrongReview) {
         setScore(prev => prev + 1);
       }
-    } else {
-      // Add to wrong queue if not already there or if we want to repeat it
+    } else if (!isWrongReview) {
+      // Main-round misses enter the review queue once. Review-round misses are
+      // moved to the back in handleNext so the queue cannot grow forever.
       setWrongQueue(prev => [...prev, currentWord]);
     }
 
@@ -338,10 +335,37 @@ export default function QuizPage() {
     persistCurrentQuestionState();
 
     if (isWrongReview) {
-      if (currentIndex < wrongQueue.length - 1) {
-        setCurrentIndex(prev => prev + 1);
+      const wasCorrect = selectedOption === currentWord.id;
+      const remainingQueue = wrongQueue.filter((_, index) => index !== currentIndex);
+      const remainingHistory = reviewQuestionHistory.filter((_, index) => index !== currentIndex);
+
+      if (wasCorrect) {
+        if (remainingQueue.length === 0) {
+          setWrongQueue([]);
+          setReviewQuestionHistory([]);
+          setCurrentIndex(0);
+          setSelectedOption(null);
+          setQuizState('finished');
+          return;
+        }
+
+        setWrongQueue(remainingQueue);
+        setReviewQuestionHistory(remainingHistory);
+        setCurrentIndex(Math.min(currentIndex, remainingQueue.length - 1));
+        setSelectedOption(null);
+        setQuizState('answering');
       } else {
-        setQuizState('finished');
+        const nextQueue = [...remainingQueue, currentWord];
+        const nextHistory = [...remainingHistory, null];
+        const nextIndex = remainingQueue.length === 0
+          ? 0
+          : Math.min(currentIndex, remainingQueue.length - 1);
+
+        setWrongQueue(nextQueue);
+        setReviewQuestionHistory(nextHistory);
+        setCurrentIndex(nextIndex);
+        setSelectedOption(null);
+        setQuizState('answering');
       }
     } else {
       if (currentIndex < quizWords.length - 1) {
@@ -401,6 +425,10 @@ export default function QuizPage() {
     );
   }
   if (!currentWord) return <div className="p-8 text-center text-gray-500">Loading Quiz...</div>;
+
+  const activeTotal = isWrongReview ? wrongQueue.length : quizWords.length;
+  const activePosition = activeTotal > 0 ? Math.min(currentIndex + 1, activeTotal) : 0;
+  const activeProgressPercent = getProgressPercent(activePosition, activeTotal);
 
   if (showResumeModal) {
     return (
@@ -533,21 +561,25 @@ export default function QuizPage() {
         >
           <ArrowLeft size={24} />
         </button>
-        <div className="flex flex-col items-center flex-1 max-w-[200px]">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 text-center w-full truncate">
+        <div className="flex min-w-0 flex-1 flex-col items-center px-3">
+          <div className="mb-2 flex w-full max-w-[220px] items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+              {isWrongReview ? 'Reviewing Errors' : (mode === 'topic' ? 'Topic Quiz' : `Chapter ${chapterId}`)}
+            </span>
+            <span className="shrink-0 text-[10px] font-black text-blue-600 dark:text-blue-400 tabular-nums leading-none">
+              {activePosition}/{activeTotal} · {activeProgressPercent}%
+            </span>
+          </div>
+          <ProgressMeter
+            className="w-full max-w-[220px]"
+            percent={activeProgressPercent}
+            ariaLabel={isWrongReview ? 'Review progress' : 'Quiz progress'}
+            trackClassName="bg-gray-100 dark:bg-gray-800"
+            fillClassName="bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.35)] duration-300 ease-out dark:bg-blue-400"
+          />
+          <span className="sr-only">
             {isWrongReview ? 'Reviewing Errors' : (mode === 'topic' ? 'Topic Quiz' : `Chapter ${chapterId}`)}
           </span>
-          <div className="flex gap-1">
-            {(isWrongReview ? wrongQueue : quizWords).map((_, i) => (
-              <div 
-                key={i} 
-                className={`h-1 rounded-full transition-all duration-300 ${
-                  i < currentIndex ? 'w-3 bg-blue-500' : 
-                  i === currentIndex ? 'w-6 bg-blue-600' : 'w-1.5 bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-            ))}
-          </div>
         </div>
         <div className="w-10" />
       </div>

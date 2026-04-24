@@ -10,6 +10,17 @@ import { processReview } from '@/lib/srs';
 import HanziWord from '@/components/HanziWord';
 import { Volume2, Info, Star, ArrowLeft, ChevronRight } from 'lucide-react';
 import { speak } from '@/lib/tts';
+import type { UserWordData } from '@/lib/srs';
+
+function createDefaultUserWord(id: string): UserWordData {
+  return {
+    id,
+    memoryStrength: 0.3,
+    lastReviewed: null,
+    nextReview: Date.now(),
+    wrongCount: 0,
+  };
+}
 
 export default function MemorizePage() {
   const router = useRouter();
@@ -54,7 +65,7 @@ export default function MemorizePage() {
     if (now === null) return [];
     return topicWords.filter(w => {
       const uw = userWords[w.id];
-      return uw && uw.nextReview <= now;
+      return (uw?.nextReview ?? 0) <= now;
     });
   }, [topicWords, userWords, now]);
 
@@ -93,7 +104,7 @@ export default function MemorizePage() {
             const topicWords = hskWords.filter(w => Number(w.level) === Number(selectedLevel) && category.words && category.words.includes(w.word));
             const dueInTopic = topicWords.filter(w => {
               const uw = userWords[w.id];
-              return uw && uw.nextReview <= now;
+              return (uw?.nextReview ?? 0) <= now;
             }).length;
 
             return (
@@ -174,7 +185,7 @@ export default function MemorizePage() {
   const isFavorite = userWords[currentWord.id]?.isFavorite || false;
 
   const handleReview = (isCorrect: boolean) => {
-    const uw = userWords[currentWord.id];
+    const uw = userWords[currentWord.id] ?? createDefaultUserWord(currentWord.id);
     const updated = processReview(uw, isCorrect);
     updateWord(currentWord.id, updated);
     setCurrentIndex(prev => prev + 1);

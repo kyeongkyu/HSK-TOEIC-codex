@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 import { ArrowLeft, Zap, Shield, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -40,7 +40,7 @@ export default function QuizDifficultyPage() {
       <header className="pt-8 mb-10">
         <div className="flex items-center justify-between mb-2">
           <button 
-            onClick={() => router.push('/')}
+            onClick={() => startTransition(() => router.push('/'))}
             className="p-3 -ml-3 text-black dark:text-white bg-gray-100 dark:bg-gray-800 rounded-2xl active:scale-95 transition-all"
           >
             <ArrowLeft size={20} />
@@ -71,7 +71,7 @@ export default function QuizDifficultyPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
-            onClick={() => router.push(`/quiz/${diff.id}?mode=${quizMode}`)}
+            onClick={() => startTransition(() => router.push(`/quiz/${diff.id}?mode=${quizMode}`))}
             className={`w-full p-6 text-left rounded-3xl border-2 transition-all active:scale-95 group relative overflow-hidden ${diff.color} ${diff.hoverColor}`}
           >
             <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500">
