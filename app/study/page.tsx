@@ -444,7 +444,7 @@ function StudyContent() {
       </div>
 
       {/* Navigation */}
-      <div className="px-5 pt-2 grid shrink-0 grid-cols-2 gap-3" style={{ paddingBottom: 'calc(0.35rem + env(safe-area-inset-bottom))' }}>
+      <div className="px-5 pt-2 grid shrink-0 grid-cols-2 gap-3" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
         <button 
           onClick={handlePrev}
           disabled={currentIndex === 0}
