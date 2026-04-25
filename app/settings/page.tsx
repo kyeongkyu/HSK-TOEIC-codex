@@ -205,7 +205,7 @@ export default function SettingsPage() {
   if (appMode === 'toeic') {
     return (
       <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
-        <div className="pt-12 mb-10 flex items-center justify-between">
+        <div className="pt-10 mb-10 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Preferences</span>
             <h1 className="text-4xl font-black text-black dark:text-white">Settings</h1>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
 
   return (
     <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
-      <div className="pt-12 mb-10">
+      <div className="pt-10 mb-10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Preferences</span>
         <h1 className="text-4xl font-black text-black dark:text-white">Settings</h1>
       </div>

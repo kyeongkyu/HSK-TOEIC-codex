@@ -363,7 +363,29 @@ export function segmentChineseForListening(text: string, question?: Pick<HskList
 
 export function stopHskSpeaking() {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    // Best-effort cleanup for mobile/PWA browsers that throw after resume.
+  }
+}
+
+function safelyPrepareHskSpeech(synthesis: SpeechSynthesis, shouldCancel = true) {
+  try {
+    if (shouldCancel) synthesis.cancel();
+  } catch {
+    // Ignore cancellation errors from a stale utterance.
+  }
+
+  try {
+    synthesis.resume();
+  } catch {
+    // Resume is best-effort; some browsers simply ignore it.
+  }
+}
+
+function isSoftSpeechError(event: SpeechSynthesisErrorEvent) {
+  return event.error === 'canceled' || event.error === 'interrupted';
 }
 
 export function playQuestionWithPause(segments: HskTtsSegment[], options: HskTtsOptions = {}) {
@@ -382,9 +404,8 @@ export function playQuestionWithPause(segments: HskTtsSegment[], options: HskTts
     cancelCurrent = true,
   } = options;
 
-  if (cancelCurrent) {
-    window.speechSynthesis.cancel();
-  }
+  const synthesis = window.speechSynthesis;
+  safelyPrepareHskSpeech(synthesis, cancelCurrent);
 
   return new Promise<void>((resolve, reject) => {
     let index = 0;
@@ -401,6 +422,10 @@ export function playQuestionWithPause(segments: HskTtsSegment[], options: HskTts
 
     const fail = (event: SpeechSynthesisErrorEvent) => {
       if (finished) return;
+      if (isSoftSpeechError(event)) {
+        finish();
+        return;
+      }
       finished = true;
       if (pauseTimeoutId !== null) window.clearTimeout(pauseTimeoutId);
       options.onError?.(event);
@@ -433,7 +458,13 @@ export function playQuestionWithPause(segments: HskTtsSegment[], options: HskTts
       };
 
       options.onSegmentStart?.(segment, index);
-      window.speechSynthesis.speak(utterance);
+      try {
+        synthesis.resume();
+        synthesis.speak(utterance);
+      } catch (error) {
+        const fallbackError = error instanceof Event ? error : new Event('error');
+        fail(fallbackError as SpeechSynthesisErrorEvent);
+      }
     };
 
     playNext();

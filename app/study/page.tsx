@@ -115,6 +115,41 @@ function StudyContent() {
     };
   }, [viewMode, selectedTopicId, pendingListFocusWordId]);
 
+  useEffect(() => {
+    const shouldLockScroll = Boolean(selectedTopicId && viewMode === 'focus' && !isListOpen);
+    if (!shouldLockScroll) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+    const lockScroll = () => {
+      window.scrollTo(0, 0);
+      document.body.style.overflow = 'hidden';
+      document.body.style.overscrollBehavior = 'none';
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.overscrollBehavior = 'none';
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') lockScroll();
+    };
+
+    lockScroll();
+    window.addEventListener('pageshow', lockScroll);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pageshow', lockScroll);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, [isListOpen, selectedTopicId, viewMode]);
+
   if (!settingsLoaded || !wordsLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
 
   if (categories && !selectedTopicId) {
@@ -200,19 +235,19 @@ function StudyContent() {
   if (viewMode === 'list' && selectedTopicId) {
     return (
       <div className="flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200">
-        <div className="px-6 pt-8 flex items-center justify-between mb-8">
-          <div className="flex items-center truncate mr-4">
-            <button 
+        <div className="px-5 pt-8 flex items-center justify-between gap-3 mb-8">
+          <div className="flex min-w-0 flex-1 items-center">
+            <button
               onClick={() => setSelectedTopicId(null)}
-              className="p-3 -ml-3 text-black dark:text-white bg-gray-100 dark:bg-gray-800 rounded-2xl active:scale-95 transition-all flex-shrink-0 transform-gpu"
+              className="p-3 text-black dark:text-white bg-gray-100 dark:bg-gray-800 rounded-2xl active:scale-95 transition-all shrink-0 transform-gpu"
             >
               <ArrowLeft size={20} />
             </button>
-            <h1 className="ml-4 text-xl font-black text-black dark:text-white truncate">
+            <h1 className="ml-4 min-w-0 truncate text-xl font-black text-black dark:text-white">
               {categories?.find(c => c.id === selectedTopicId)?.name}
             </h1>
           </div>
-          <div className="flex gap-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-full flex-shrink-0">
+          <div className="flex shrink-0 gap-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-full">
             <button
               onClick={() => setViewMode('focus')}
               className="px-3 py-1.5 rounded-full text-xs font-bold transition-all text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white"
@@ -287,9 +322,9 @@ function StudyContent() {
   }
 
   return (
-    <div className="flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-white dark:bg-gray-900 transition-colors duration-200">
       {/* Header */}
-      <div className="px-5 pt-4 sm:pt-6 flex items-center justify-between mb-4">
+      <div className="px-5 pt-4 sm:pt-6 flex shrink-0 items-center justify-between mb-4">
         <div className="flex items-center min-w-0 mr-4">
           <button 
             onClick={() => {
@@ -335,7 +370,7 @@ function StudyContent() {
       </div>
 
       {/* Word Content */}
-      <div className="flex-1 min-h-0 px-5 flex flex-col items-center justify-start text-center gap-5 w-full max-w-md mx-auto overflow-y-auto pb-3">
+      <div className="flex-1 min-h-0 px-5 flex flex-col items-center justify-start text-center gap-5 w-full max-w-md mx-auto overflow-hidden pb-3">
         <div className="relative w-full">
           {currentWord.memorizationTip && (
             <motion.div 
@@ -409,7 +444,7 @@ function StudyContent() {
       </div>
 
       {/* Navigation */}
-      <div className="px-5 pt-2 grid grid-cols-2 gap-3" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+      <div className="px-5 pt-2 grid shrink-0 grid-cols-2 gap-3" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
         <button 
           onClick={handlePrev}
           disabled={currentIndex === 0}

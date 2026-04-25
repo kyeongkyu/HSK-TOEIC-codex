@@ -2,14 +2,57 @@ export const getTtsRate = (level: number) => {
   return 0.5 + (level - 1) * 0.25;
 };
 
+function safelyPrepareSpeech(synthesis: SpeechSynthesis, shouldCancel = true) {
+  try {
+    if (shouldCancel) synthesis.cancel();
+  } catch {
+    // Some mobile browsers throw while resuming from a suspended PWA state.
+  }
+
+  try {
+    synthesis.resume();
+  } catch {
+    // Resume is best-effort; speak() still works on browsers that ignore it.
+  }
+}
+
+function getPreferredVoice(voices: SpeechSynthesisVoice[], targetLang: string) {
+  const normalizedLang = targetLang.toLowerCase();
+
+  if (normalizedLang.includes('zh')) {
+    return voices.find((voice) => {
+      const lang = voice.lang.toLowerCase();
+      const name = voice.name.toLowerCase();
+      return (
+        lang.includes('zh-cn') ||
+        lang.includes('zh-hans') ||
+        lang.includes('zh-hk') ||
+        lang.includes('zh-tw') ||
+        name.includes('chinese') ||
+        name.includes('mandarin')
+      );
+    }) ?? null;
+  }
+
+  if (normalizedLang.includes('en')) {
+    return voices.find((voice) => {
+      const lang = voice.lang.toLowerCase();
+      const name = voice.name.toLowerCase();
+      return lang.includes('en-us') || lang.includes('en-gb') || name.includes('english');
+    }) ?? null;
+  }
+
+  return null;
+}
+
 export const speak = (text: string, level: number = 3, targetLang: string = 'zh-CN', onEnd?: () => void) => {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
+  if (typeof window === 'undefined' || !window.speechSynthesis || !text.trim()) {
     onEnd?.();
     return;
   }
-  
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
+
+  const synthesis = window.speechSynthesis;
+  safelyPrepareSpeech(synthesis);
   
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = targetLang;
@@ -17,37 +60,17 @@ export const speak = (text: string, level: number = 3, targetLang: string = 'zh-
   utterance.onend = () => onEnd?.();
   utterance.onerror = () => onEnd?.();
   
-  const voices = window.speechSynthesis.getVoices();
-  
-  if (targetLang.includes('zh')) {
-    // Try to find a Chinese voice immediately
-    const chineseVoice = voices.find(v => 
-      v.lang.includes('zh-CN') || 
-      v.lang.includes('zh-HK') || 
-      v.lang.includes('zh-TW') ||
-      v.name.includes('Chinese') || 
-      v.name.includes('Mandarin')
-    );
-    
-    if (chineseVoice) {
-      utterance.voice = chineseVoice;
-      utterance.lang = chineseVoice.lang;
-    }
-  } else if (targetLang.includes('en')) {
-    // Try to find an English voice
-    const englishVoice = voices.find(v => 
-      v.lang.includes('en-US') || 
-      v.lang.includes('en-GB') || 
-      v.name.includes('English')
-    );
-    if (englishVoice) {
-      utterance.voice = englishVoice;
-      utterance.lang = englishVoice.lang;
-    }
+  const preferredVoice = getPreferredVoice(synthesis.getVoices(), targetLang);
+  if (preferredVoice) {
+    utterance.voice = preferredVoice;
+    utterance.lang = preferredVoice.lang;
   }
   
-  // Speak immediately to preserve user gesture context
-  window.speechSynthesis.speak(utterance);
+  try {
+    synthesis.speak(utterance);
+  } catch {
+    onEnd?.();
+  }
 };
 
 export type TtsVoiceProfile = {
@@ -187,7 +210,11 @@ export function buildUtteranceOptions(
 
 export function stopSpeaking() {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    // Best-effort cleanup for browsers that throw after PWA resume.
+  }
 }
 
 function splitForNaturalPauses(text: string) {
@@ -214,9 +241,7 @@ export function speakText(text: string, options: LcUtteranceOptions = {}) {
     cancelCurrent = true,
   } = options;
 
-  if (cancelCurrent) {
-    window.speechSynthesis.cancel();
-  }
+  safelyPrepareSpeech(window.speechSynthesis, cancelCurrent);
 
   return new Promise<void>((resolve, reject) => {
     let index = 0;
@@ -263,7 +288,12 @@ export function speakText(text: string, options: LcUtteranceOptions = {}) {
         window.setTimeout(playNext, pauseMs);
       };
 
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        fail(error as SpeechSynthesisErrorEvent);
+      }
     };
 
     playNext();

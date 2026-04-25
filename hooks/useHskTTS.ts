@@ -57,8 +57,9 @@ export function useHskTTS(preferredProfile: HskTtsVoicePreference = DEFAULT_PREF
     let initialLoadTimeoutId: number | null = null;
 
     const loadVoices = (attempt = 0) => {
-      const nextVoices = getChineseVoices(synthesis.getVoices());
-      const nextProfiles = buildHskVoiceProfiles(nextVoices, preferredProfile);
+      const allVoices = synthesis.getVoices();
+      const nextVoices = getChineseVoices(allVoices);
+      const nextProfiles = buildHskVoiceProfiles(nextVoices.length > 0 ? nextVoices : allVoices, preferredProfile);
       if (!isMountedRef.current) return;
 
       setVoices(nextVoices);
@@ -83,7 +84,7 @@ export function useHskTTS(preferredProfile: HskTtsVoicePreference = DEFAULT_PREF
       }
 
       setIsLoadingVoices(false);
-      setError('No Chinese voice is available in this browser.');
+      setError(null);
     };
 
     const handleVoicesChanged = () => loadVoices();

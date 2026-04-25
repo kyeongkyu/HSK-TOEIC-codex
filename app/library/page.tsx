@@ -65,7 +65,7 @@ export default function LibraryPage() {
   return (
     <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
       {/* Header */}
-      <div className="pt-12 mb-10">
+      <div className="pt-10 mb-10">
         <div className="flex items-center justify-between mb-6">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Collection</span>

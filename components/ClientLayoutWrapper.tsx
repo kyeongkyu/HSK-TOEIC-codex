@@ -59,6 +59,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
 
     const prefetchRoutes = () => {
       routes.forEach(route => router.prefetch(route));
+      navigator.serviceWorker?.controller?.postMessage({ type: 'WARM_OFFLINE_ROUTES' });
     };
 
     if ('requestIdleCallback' in window) {
