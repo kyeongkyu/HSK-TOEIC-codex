@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import HanziWriter from 'hanzi-writer';
 
 import { useSettings } from '@/hooks/use-settings';
 
@@ -37,31 +36,41 @@ export default function HanziWord({ word, shouldAnimate = true, singleLine = fal
 
 function HanziChar({ char, shouldAnimate, size, compact }: { char: string, shouldAnimate: boolean, size: number, compact: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const writerRef = useRef<HanziWriter | null>(null);
+  const writerRef = useRef<{ animateCharacter: () => void } | null>(null);
   const { isDarkMode } = useSettings();
 
   useEffect(() => {
     if (!ref.current) return;
+    let isCancelled = false;
     ref.current.innerHTML = '';
-    writerRef.current = HanziWriter.create(ref.current, char, {
-      width: size,
-      height: size,
-      padding: compact ? 3 : 5,
-      strokeAnimationSpeed: 1.5,
-      delayBetweenStrokes: 50,
-      showOutline: true,
-      strokeColor: isDarkMode ? '#ffffff' : '#1f2937',
-      radicalColor: isDarkMode ? '#93c5fd' : '#2563eb', // Lighter blue for dark mode
-      outlineColor: isDarkMode ? '#374151' : '#e5e7eb', // Darker outline for dark mode to not compete with stroke
-    });
-    
-    if (shouldAnimate) {
-      const timeout = setTimeout(() => {
-        writerRef.current?.animateCharacter();
-      }, 500);
+    writerRef.current = null;
 
-      return () => clearTimeout(timeout);
-    }
+    void import('hanzi-writer').then(({ default: HanziWriter }) => {
+      if (isCancelled || !ref.current) return;
+      writerRef.current = HanziWriter.create(ref.current, char, {
+        width: size,
+        height: size,
+        padding: compact ? 3 : 5,
+        strokeAnimationSpeed: 1.5,
+        delayBetweenStrokes: 50,
+        showOutline: true,
+        strokeColor: isDarkMode ? '#ffffff' : '#1f2937',
+        radicalColor: isDarkMode ? '#93c5fd' : '#2563eb',
+        outlineColor: isDarkMode ? '#374151' : '#e5e7eb',
+      });
+
+      if (shouldAnimate) {
+        globalThis.setTimeout(() => {
+          if (!isCancelled) {
+            writerRef.current?.animateCharacter();
+          }
+        }, 500);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [char, isDarkMode, shouldAnimate, size, compact]);
 
   const animate = () => {

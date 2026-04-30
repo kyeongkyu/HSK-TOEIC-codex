@@ -2,8 +2,20 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { ToeicPart5Practice } from '@/components/ToeicPart5Practice';
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
+
+const ToeicPart5Practice = dynamic(
+  () => import('@/components/ToeicPart5Practice').then((module) => module.ToeicPart5Practice),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-[2rem] border border-gray-100 bg-gray-50 p-8 text-center text-sm font-bold text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+        Loading Part 5...
+      </div>
+    ),
+  },
+);
 
 export default function ToeicPart5Page() {
   const [isPracticeActive, setIsPracticeActive] = useState(false);

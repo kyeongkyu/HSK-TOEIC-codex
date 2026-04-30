@@ -40,7 +40,7 @@ export default function Navigation() {
 
   return (
     <nav 
-      className="fixed left-0 right-0 mx-auto w-[calc(100%-2rem)] max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg rounded-3xl flex justify-around py-1.5 z-[9999] pointer-events-auto transition-colors duration-200"
+      className="fixed left-0 right-0 mx-auto w-[calc(100%-2rem)] max-w-md bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border border-gray-200/70 dark:border-gray-700/70 shadow-lg rounded-3xl flex justify-around py-1.5 z-[9999] pointer-events-auto transition-colors duration-200"
       style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
     >
       {appMode === 'hsk' && (

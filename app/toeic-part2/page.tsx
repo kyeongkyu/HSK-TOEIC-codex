@@ -2,8 +2,20 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { ListeningQuiz } from '@/components/lc/ListeningQuiz';
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
+
+const ListeningQuiz = dynamic(
+  () => import('@/components/lc/ListeningQuiz').then((module) => module.ListeningQuiz),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-[2rem] border border-gray-100 bg-gray-50 p-8 text-center text-sm font-bold text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+        Loading listening practice...
+      </div>
+    ),
+  },
+);
 
 export default function ToeicPart2Page() {
   const [isPracticeActive, setIsPracticeActive] = useState(false);

@@ -11,6 +11,15 @@ import HanziWord from '@/components/HanziWord';
 import { Volume2, Info, Star, ArrowLeft, ChevronRight } from 'lucide-react';
 import { speak } from '@/lib/tts';
 import type { UserWordData } from '@/lib/srs';
+import { getResumeTaskSnapshot } from '@/lib/resume-task';
+import { useResumeSnapshot } from '@/hooks/use-resume-snapshot';
+
+type MemorizeResumeSnapshot = {
+  selectedTopicId: string | null;
+  currentIndex: number;
+  isReviewing: boolean;
+  wordId?: string;
+};
 
 function createDefaultUserWord(id: string): UserWordData {
   return {
@@ -31,6 +40,7 @@ export default function MemorizePage() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [sessionWords, setSessionWords] = useState<typeof hskWords>([]);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [resumeRestored, setResumeRestored] = useState(false);
 
   const hanziTextSize = hanziSize === 1 ? 'text-4xl' : hanziSize === 2 ? 'text-6xl' : 'text-8xl';
 
@@ -83,6 +93,59 @@ export default function MemorizePage() {
       setCurrentIndex(0);
     }
   }, [selectedTopicId, categories]);
+
+  useEffect(() => {
+    if (!wordsLoaded || !settingsLoaded || now === null || resumeRestored) return;
+    const snapshot = getResumeTaskSnapshot<MemorizeResumeSnapshot>('/memorize');
+    if (!snapshot) {
+      setResumeRestored(true);
+      return;
+    }
+
+    if ((categories && !snapshot.selectedTopicId) || !snapshot.isReviewing) {
+      setResumeRestored(true);
+      return;
+    }
+
+    if (snapshot.selectedTopicId !== selectedTopicId) {
+      setSelectedTopicId(snapshot.selectedTopicId);
+      return;
+    }
+
+    const restoreWords = snapshot.isReviewing ? (sessionWords.length > 0 ? sessionWords : dueWords) : dueWords;
+    if (restoreWords.length === 0) return;
+
+    const nextIndex = snapshot.wordId
+      ? restoreWords.findIndex(word => word.id === snapshot.wordId)
+      : snapshot.currentIndex;
+    setCurrentIndex(Math.min(Math.max(nextIndex === -1 ? snapshot.currentIndex : nextIndex, 0), restoreWords.length - 1));
+    setIsReviewing(snapshot.isReviewing);
+    if (snapshot.isReviewing && sessionWords.length === 0) {
+      setSessionWords(restoreWords);
+    }
+    setResumeRestored(true);
+  }, [categories, dueWords, now, resumeRestored, selectedTopicId, sessionWords, settingsLoaded, wordsLoaded]);
+
+  const activeWords = isReviewing ? sessionWords : dueWords;
+
+  const resumeSnapshot = useMemo<MemorizeResumeSnapshot | null>(() => {
+    const currentWord = activeWords[currentIndex] ?? activeWords[0];
+    return currentWord ? {
+      selectedTopicId,
+      currentIndex,
+      isReviewing,
+      wordId: currentWord.id,
+    } : null;
+  }, [activeWords, currentIndex, isReviewing, selectedTopicId]);
+
+  useResumeSnapshot({
+    route: '/memorize',
+    label: 'Memorize',
+    snapshot: resumeSnapshot,
+    enabled: wordsLoaded && settingsLoaded && now !== null && resumeRestored,
+    active: isReviewing && (!categories || Boolean(selectedTopicId)),
+    hasContent: activeWords.length > 0,
+  });
 
   if (!wordsLoaded || !settingsLoaded || now === null) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
 
@@ -141,7 +204,6 @@ export default function MemorizePage() {
     );
   }
 
-  const activeWords = isReviewing ? sessionWords : dueWords;
   const isFinished = isReviewing 
     ? currentIndex >= sessionWords.length 
     : (dueWords.length === 0);

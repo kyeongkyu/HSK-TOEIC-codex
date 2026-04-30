@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Check, CheckCircle2, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { useSettings } from '@/hooks/use-settings';
@@ -9,12 +9,18 @@ import { grammarData, GrammarPoint, GrammarPracticeQuestion } from '@/data/gramm
 import SegmentedSentence from '@/components/SegmentedSentence';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { getProgressPercent, readLocalStorageJson, uniqueStrings, writeLocalStorageJson } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot, shouldSaveActiveResumeSnapshot } from '@/lib/resume-task';
 
 type GrammarProgress = {
   completedPointIds: string[];
   correctQuestionIds: string[];
   wrongQuestionIds: string[];
   lastStudiedAt?: string;
+};
+type GrammarResumeSnapshot = {
+  activePointId: string | null;
+  answerState: Record<string, { answer: string; correct: boolean }>;
+  scrollY: number;
 };
 
 const GRAMMAR_PROGRESS_KEY = 'hsk_grammar_progress';
@@ -132,21 +138,32 @@ function GrammarCard({
   point,
   completed,
   answerState,
+  resumeExpanded,
   onComplete,
   onAnswer,
+  onView,
 }: {
   point: GrammarPoint;
   completed: boolean;
   answerState: Record<string, { answer: string; correct: boolean }>;
+  resumeExpanded?: boolean;
   onComplete: (pointId: string) => void;
   onAnswer: (pointId: string, question: GrammarPracticeQuestion, answer: string) => void;
+  onView?: (pointId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (resumeExpanded) setExpanded(true);
+  }, [resumeExpanded]);
 
   return (
     <article className="overflow-hidden rounded-[1.5rem] border border-gray-100 bg-white shadow-sm transition-all dark:border-gray-700 dark:bg-gray-800/70">
       <button
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => {
+          setExpanded((value) => !value);
+          onView?.(point.id);
+        }}
         className="w-full p-5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
       >
         <div className="flex items-start justify-between gap-4">
@@ -249,10 +266,36 @@ export default function GrammarPageClient() {
   const { selectedLevel, isLoaded } = useSettings();
   const [progress, setProgress] = useState<GrammarProgress>(emptyProgress);
   const [answerState, setAnswerState] = useState<Record<string, { answer: string; correct: boolean }>>({});
+  const [activePointId, setActivePointId] = useState<string | null>(null);
+  const restoredRef = useRef(false);
+  const pointRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     setProgress(readGrammarProgress());
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded || restoredRef.current) return;
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<GrammarResumeSnapshot>('/grammar');
+      if (!snapshot) {
+        restoredRef.current = true;
+        return;
+      }
+      setAnswerState(snapshot.answerState ?? {});
+      setActivePointId(snapshot.activePointId);
+      restoredRef.current = true;
+      requestAnimationFrame(() => {
+        if (snapshot.activePointId && pointRefs.current[snapshot.activePointId]) {
+          pointRefs.current[snapshot.activePointId]?.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } else {
+          window.scrollTo({ top: snapshot.scrollY ?? 0, behavior: 'auto' });
+        }
+      });
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [isLoaded]);
 
   const filteredGrammar = useMemo(() => {
     return grammarData.filter((point) => selectedLevel === 'all' || point.level === selectedLevel);
@@ -289,6 +332,36 @@ export default function GrammarPageClient() {
       lastStudiedAt: new Date().toISOString(),
     }));
   };
+
+  useEffect(() => {
+    if (!isLoaded || !restoredRef.current || !shouldSaveActiveResumeSnapshot(Boolean(activePointId))) return;
+    setResumeTaskSnapshot('/grammar', 'Grammar', {
+      activePointId,
+      answerState,
+      scrollY: window.scrollY,
+    } satisfies GrammarResumeSnapshot);
+  }, [activePointId, answerState, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !restoredRef.current || !shouldSaveActiveResumeSnapshot(Boolean(activePointId))) return;
+    let frameId = 0;
+    const saveScrollSnapshot = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        setResumeTaskSnapshot('/grammar', 'Grammar', {
+          activePointId,
+          answerState,
+          scrollY: window.scrollY,
+        } satisfies GrammarResumeSnapshot);
+      });
+    };
+
+    window.addEventListener('scroll', saveScrollSnapshot, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', saveScrollSnapshot);
+    };
+  }, [activePointId, answerState, isLoaded]);
 
   if (!isLoaded) {
     return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
@@ -346,14 +419,22 @@ export default function GrammarPageClient() {
               </div>
               <div className="space-y-4">
                 {points.map((point) => (
-                  <GrammarCard
+                  <div
                     key={point.id}
-                    point={point}
-                    completed={completedSet.has(point.id)}
-                    answerState={answerState}
-                    onComplete={handleComplete}
-                    onAnswer={handleAnswer}
-                  />
+                    ref={(node) => {
+                      pointRefs.current[point.id] = node;
+                    }}
+                  >
+                    <GrammarCard
+                      point={point}
+                      completed={completedSet.has(point.id)}
+                      answerState={answerState}
+                      resumeExpanded={activePointId === point.id}
+                      onView={setActivePointId}
+                      onComplete={handleComplete}
+                      onAnswer={handleAnswer}
+                    />
+                  </div>
                 ))}
               </div>
             </section>
@@ -361,14 +442,22 @@ export default function GrammarPageClient() {
         ) : (
           <div className="space-y-4">
             {filteredGrammar.map((point) => (
-              <GrammarCard
+              <div
                 key={point.id}
-                point={point}
-                completed={completedSet.has(point.id)}
-                answerState={answerState}
-                onComplete={handleComplete}
-                onAnswer={handleAnswer}
-              />
+                ref={(node) => {
+                  pointRefs.current[point.id] = node;
+                }}
+              >
+                <GrammarCard
+                  point={point}
+                  completed={completedSet.has(point.id)}
+                  answerState={answerState}
+                  resumeExpanded={activePointId === point.id}
+                  onView={setActivePointId}
+                  onComplete={handleComplete}
+                  onAnswer={handleAnswer}
+                />
+              </div>
             ))}
           </div>
         )}

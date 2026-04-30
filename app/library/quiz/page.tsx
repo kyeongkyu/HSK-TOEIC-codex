@@ -1,19 +1,21 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUserWords } from '@/hooks/use-user-words';
 import { useSettings } from '@/hooks/use-settings';
 import { hskWords } from '@/data/hsk';
 import { WordData } from '@/lib/srs';
 import { sentences, SentenceData } from '@/data/sentences';
-import { ArrowLeft, Volume2, CheckCircle2, XCircle, RefreshCcw, AlertCircle, ChevronRight, Trophy, Sparkles, RotateCcw, Star, Eye } from 'lucide-react';
+import { ArrowLeft, Volume2, CheckCircle2, XCircle, RefreshCcw, ChevronRight, Trophy, Sparkles, RotateCcw, Star, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { speak } from '@/lib/tts';
 import SegmentedSentence from '@/components/SegmentedSentence';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { QuizFeedbackPanel } from '@/components/ui/QuizFeedbackPanel';
 import { clampCount, getProgressPercent } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 
 type QuestionFormat = 'hanzi-to-meaning' | 'meaning-to-hanzi' | 'sentence-fill' | 'sentence-unscramble-ko' | 'sentence-unscramble-zh';
 
@@ -33,6 +35,16 @@ type LibraryQuizSnapshot = {
   selectedOption: string | null;
   userTokens: string[];
   shuffledTokens: string[];
+};
+type LibraryQuizResumeSnapshot = {
+  questions: LibraryQuizQuestion[];
+  currentIndex: number;
+  quizState: Exclude<QuizState, 'finished'>;
+  selectedOption: string | null;
+  userTokens: string[];
+  shuffledTokens: string[];
+  questionSnapshots: Array<LibraryQuizSnapshot | null>;
+  score: number;
 };
 
 function shuffleArray<T>(items: T[]) {
@@ -82,6 +94,8 @@ export default function LibraryQuizPage() {
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
   const [questionSnapshots, setQuestionSnapshots] = useState<Array<LibraryQuizSnapshot | null>>([]);
+  const resumeRoute = '/library/quiz';
+  const resumeHydratedRef = useRef(false);
 
   // Get library words
   const libraryWords = useMemo(() => {
@@ -177,6 +191,29 @@ export default function LibraryQuizPage() {
   }, [libraryWords, questions.length, selectedLevel, separateLibraryByLevel]);
 
   useEffect(() => {
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<LibraryQuizResumeSnapshot>(resumeRoute);
+      if (!snapshot || snapshot.questions.length === 0) {
+        resumeHydratedRef.current = true;
+        return;
+      }
+
+      setQuestions(snapshot.questions);
+      setCurrentIndex(Math.min(Math.max(snapshot.currentIndex, 0), snapshot.questions.length - 1));
+      setQuizState(snapshot.quizState);
+      setSelectedOption(snapshot.selectedOption);
+      setUserTokens(snapshot.userTokens);
+      setShuffledTokens(snapshot.shuffledTokens);
+      setQuestionSnapshots(snapshot.questionSnapshots);
+      setScore(snapshot.score);
+      setShowResumeModal(false);
+      resumeHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [resumeRoute]);
+
+  useEffect(() => {
     if (wordsLoaded && libraryWords.length === 0) {
       router.push('/library');
     }
@@ -184,6 +221,20 @@ export default function LibraryQuizPage() {
 
   const currentQuestion = questions[currentIndex];
   const currentSnapshot = questionSnapshots[currentIndex];
+
+  useEffect(() => {
+    if (!resumeHydratedRef.current || questions.length === 0 || quizState === 'finished') return;
+    setResumeTaskSnapshot(resumeRoute, 'Library Quiz', {
+      questions,
+      currentIndex,
+      quizState,
+      selectedOption,
+      userTokens,
+      shuffledTokens,
+      questionSnapshots,
+      score,
+    } satisfies LibraryQuizResumeSnapshot);
+  }, [currentIndex, questionSnapshots, questions, quizState, resumeRoute, score, selectedOption, shuffledTokens, userTokens]);
 
   const isCorrect = useMemo(() => {
     if (!currentQuestion) return false;
@@ -856,7 +907,7 @@ export default function LibraryQuizPage() {
       </div>
 
       {/* Feedback Footer & Navigation */}
-      <div className="px-6 h-48 flex flex-col items-center justify-center gap-4">
+      <div className="px-6 pb-6 pt-4 flex flex-col items-center justify-center gap-4">
         <AnimatePresence>
           {quizState === 'feedback' && (
             <motion.div 
@@ -865,19 +916,23 @@ export default function LibraryQuizPage() {
               exit={{ opacity: 0, y: 20 }}
               className="w-full max-w-2xl flex flex-col items-center"
             >
-              <div className={`mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${isCorrect ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
-                {isCorrect ? (
-                  <><CheckCircle2 size={16} /> Correct Choice</>
-                ) : (
-                  <><AlertCircle size={16} /> Incorrect Choice</>
-                )}
-              </div>
-              
-              <div className="text-center mb-6">
-                <div className="text-lg font-bold text-blue-600 dark:text-blue-400 italic mb-1">{currentQuestion.word.pinyin.toLowerCase()}</div>
-                <div className="text-sm font-medium text-gray-600 dark:text-gray-300">{currentQuestion.word.meaning}</div>
-              </div>
-
+              <QuizFeedbackPanel isCorrect={isCorrect} className="mb-4 w-full">
+                <div className="rounded-3xl bg-white p-5 text-center shadow-sm dark:bg-gray-900/70">
+                  <div className="flex justify-center">
+                    <SegmentedSentence
+                      sentence={currentQuestion.sentence?.chinese ?? currentQuestion.word.word}
+                      hidePlayButton
+                      interactive={true}
+                    />
+                  </div>
+                  <div className="mt-3 text-base font-black text-blue-600 dark:text-blue-400">
+                    {(currentQuestion.sentence?.pinyin ?? currentQuestion.word.pinyin).toLowerCase()}
+                  </div>
+                  <p className="mt-1 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-400">
+                    {currentQuestion.sentence?.korean ?? currentQuestion.word.meaning}
+                  </p>
+                </div>
+              </QuizFeedbackPanel>
               <div className="flex w-full gap-3">
                 <button 
                   onClick={handlePrevious}

@@ -31,9 +31,25 @@ import { useHskTTS } from '@/hooks/useHskTTS';
 import { formatPinyin } from '@/lib/pinyin';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { getProgressPercent } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot, shouldSaveActiveResumeSnapshot } from '@/lib/resume-task';
+import { clampQuestionIndex, findQuestionIndexById } from '@/features/listening/session';
 
 type Step = 'topic' | 'mode' | 'review-filter' | 'questions' | 'results';
 type StudyMode = 'practice' | 'quiz' | 'review';
+type HskListeningResumeSnapshot = {
+  step: Step;
+  selectedLevel: HskListeningLevel;
+  selectedTopic: HskListeningTopic | null;
+  selectedMode: StudyMode | null;
+  reviewFilter: HskListeningReviewFilter | null;
+  currentIndex: number;
+  questionId?: string;
+  selectedAnswer: string;
+  submitted: boolean;
+  revealStep: number;
+  sessionResults: HskListeningAttempt[];
+  sessionPlayCounts: Record<string, number>;
+};
 
 type ProgressState = {
   attempts: HskListeningAttempt[];
@@ -145,6 +161,9 @@ export default function HskListeningPage() {
   const [sessionResults, setSessionResults] = useState<HskListeningAttempt[]>([]);
   const [sessionPlayCounts, setSessionPlayCounts] = useState<Record<string, number>>({});
   const questionStartRef = useRef(0);
+  const resumeRestoredRef = useRef(false);
+  const resumeRestoreInFlightRef = useRef(false);
+  const resumeQuestionIdRef = useRef<string | null>(null);
   const selectedLevel = (homeSelectedLevel === 'all' ? 1 : homeSelectedLevel) as HskListeningLevel;
 
   useEffect(() => {
@@ -163,6 +182,12 @@ export default function HskListeningPage() {
   }, []);
 
   useEffect(() => {
+    if (resumeRestoreInFlightRef.current) {
+      resumeRestoreInFlightRef.current = false;
+      questionStartRef.current = Date.now();
+      stopTts();
+      return;
+    }
     questionStartRef.current = Date.now();
     stopTts();
     setSelectedAnswer('');
@@ -283,6 +308,67 @@ export default function HskListeningPage() {
   const isBookmarked = currentQuestion ? progress.bookmarkedIds.includes(currentQuestion.id) : false;
   const currentPlayCount = currentQuestion ? (sessionPlayCounts[currentQuestion.id] ?? 0) : 0;
   const isCurrentCorrect = currentQuestion ? isAnswerCorrect(currentQuestion, selectedAnswer) : false;
+
+  useEffect(() => {
+    if (resumeRestoredRef.current) return;
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<HskListeningResumeSnapshot>('/hsk-listening');
+      if (!snapshot || snapshot.selectedLevel !== selectedLevel) {
+        resumeRestoredRef.current = true;
+        return;
+      }
+
+      resumeRestoreInFlightRef.current = true;
+      setStep(snapshot.step);
+      setSelectedTopic(snapshot.selectedTopic);
+      setSelectedMode(snapshot.selectedMode);
+      setReviewFilter(snapshot.reviewFilter);
+      resumeQuestionIdRef.current = snapshot.questionId ?? null;
+      setCurrentIndex(Math.max(snapshot.currentIndex, 0));
+      setSelectedAnswer(snapshot.selectedAnswer);
+      setSubmitted(snapshot.submitted);
+      setRevealStep(snapshot.revealStep);
+      setSessionResults(snapshot.sessionResults);
+      setSessionPlayCounts(snapshot.sessionPlayCounts);
+      resumeRestoredRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [selectedLevel]);
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current || !resumeQuestionIdRef.current || questions.length === 0) return;
+    const nextIndex = findQuestionIndexById(questions, resumeQuestionIdRef.current);
+    resumeQuestionIdRef.current = null;
+    if (nextIndex !== -1 && nextIndex !== currentIndex) {
+      resumeRestoreInFlightRef.current = true;
+      setCurrentIndex(nextIndex);
+    }
+  }, [currentIndex, questions]);
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current) return;
+    const isActiveListeningQuestion = step === 'questions' && Boolean(selectedTopic) && Boolean(selectedMode) && Boolean(currentQuestion);
+    if (!shouldSaveActiveResumeSnapshot(isActiveListeningQuestion, questions.length > 0)) return;
+    if (selectedMode === 'review' && !reviewFilter) return;
+    const activeIndex = currentQuestion?.id && questions.length > 0
+      ? questions.findIndex(question => question.id === currentQuestion.id)
+      : currentIndex;
+    setResumeTaskSnapshot('/hsk-listening', 'Listening', {
+      step,
+      selectedLevel,
+      selectedTopic,
+      selectedMode,
+      reviewFilter,
+      currentIndex: clampQuestionIndex(activeIndex === -1 ? currentIndex : activeIndex, questions.length),
+      questionId: currentQuestion?.id,
+      selectedAnswer,
+      submitted,
+      revealStep,
+      sessionResults,
+      sessionPlayCounts,
+    } satisfies HskListeningResumeSnapshot);
+  }, [currentIndex, currentQuestion, questions, revealStep, reviewFilter, selectedAnswer, selectedLevel, selectedMode, selectedTopic, sessionPlayCounts, sessionResults, step, submitted]);
 
   const goBack = () => {
     if (step === 'questions') {

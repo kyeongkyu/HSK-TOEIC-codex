@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSettings } from '@/hooks/use-settings';
 import { hskWords } from '@/data/hsk';
@@ -11,7 +11,9 @@ import { useUserWords } from '@/hooks/use-user-words';
 import { ArrowLeft, Volume2, CheckCircle2, XCircle, RefreshCcw, ChevronRight, Trophy, AlertCircle, Star, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { QuizFeedbackPanel } from '@/components/ui/QuizFeedbackPanel';
 import { clampCount, getProgressPercent } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 
 type QuizState = 'answering' | 'feedback' | 'finished';
 type QuizQuestionType = 'hanzi-to-meaning' | 'meaning-to-hanzi';
@@ -20,6 +22,14 @@ type QuizQuestionSnapshot = {
   quizState: Exclude<QuizState, 'finished'>;
   optionIds: string[];
   questionType: QuizQuestionType;
+};
+type QuizResumeSnapshot = {
+  currentIndex: number;
+  selectedOption: string | null;
+  quizState: Exclude<QuizState, 'finished'>;
+  score: number;
+  isWrongReview: boolean;
+  wrongQueueIds: string[];
 };
 
 function getQuizProgressStorageKey(difficulty: string, mode: string, chapterParam: string) {
@@ -80,6 +90,7 @@ export default function QuizPage() {
   const chapterParam = params.chapter as string;
   const mode = searchParams.get('mode') || 'chapter';
   const chapterId = mode === 'chapter' ? parseInt(chapterParam) : NaN;
+  const resumeRoute = `/quiz/${difficulty}/${chapterParam}?mode=${mode}`;
   const storageKey = getQuizProgressStorageKey(difficulty, mode, chapterParam);
   const legacyStorageKey = getLegacyQuizProgressStorageKey(difficulty, chapterParam);
   const { selectedLevel, ttsSpeed, hanziFont, isLoaded: settingsLoaded } = useSettings();
@@ -100,6 +111,7 @@ export default function QuizPage() {
     wrongQueueIds: string[];
     score: number;
   } | null>(null);
+  const resumeHydratedRef = useRef(false);
 
   useEffect(() => {
     if (quizState !== 'finished' && (currentIndex > 0 || isWrongReview)) {
@@ -171,6 +183,48 @@ export default function QuizPage() {
       }
     }
   }, [legacyStorageKey, quizWords.length, settingsLoaded, storageKey]);
+
+  useEffect(() => {
+    if (!settingsLoaded || quizWords.length === 0) return;
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<QuizResumeSnapshot>(resumeRoute);
+      if (!snapshot) {
+        resumeHydratedRef.current = true;
+        return;
+      }
+
+      const orderedWrongQueue = snapshot.wrongQueueIds
+        .map(id => allFilteredWords.find(word => word.id === id))
+        .filter(Boolean) as WordData[];
+      const activeTotal = snapshot.isWrongReview ? orderedWrongQueue.length : quizWords.length;
+      const nextIndex = activeTotal > 0
+        ? Math.min(Math.max(snapshot.currentIndex, 0), activeTotal - 1)
+        : 0;
+
+      setShowResumeModal(false);
+      setIsWrongReview(snapshot.isWrongReview && orderedWrongQueue.length > 0);
+      setWrongQueue(orderedWrongQueue);
+      setCurrentIndex(nextIndex);
+      setSelectedOption(snapshot.selectedOption);
+      setQuizState(snapshot.quizState);
+      setScore(clampCount(snapshot.score, quizWords.length));
+      resumeHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [allFilteredWords, quizWords.length, resumeRoute, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded || !resumeHydratedRef.current || quizState === 'finished') return;
+    setResumeTaskSnapshot(resumeRoute, 'Quiz', {
+      currentIndex,
+      selectedOption,
+      quizState,
+      score,
+      isWrongReview,
+      wrongQueueIds: wrongQueue.map(word => word.id),
+    } satisfies QuizResumeSnapshot);
+  }, [currentIndex, isWrongReview, quizState, resumeRoute, score, selectedOption, settingsLoaded, wrongQueue]);
 
   const currentWord = useMemo(() => {
     if (isWrongReview) {
@@ -272,6 +326,8 @@ export default function QuizPage() {
   }, [currentWord, allFilteredWords, optionsCount, activeHistory, currentIndex]);
 
   useEffect(() => {
+    if (quizState === 'finished') return;
+
     const snapshot = activeHistory[currentIndex];
     if (snapshot) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Restores the previously answered state for the active question when navigating backward.
@@ -282,7 +338,7 @@ export default function QuizPage() {
 
     setSelectedOption(null);
     setQuizState('answering');
-  }, [activeHistory, currentIndex]);
+  }, [activeHistory, currentIndex, quizState]);
 
   useEffect(() => {
     const totalQuestions = isWrongReview ? wrongQueue.length : quizWords.length;
@@ -343,6 +399,7 @@ export default function QuizPage() {
         if (remainingQueue.length === 0) {
           setWrongQueue([]);
           setReviewQuestionHistory([]);
+          setIsWrongReview(false);
           setCurrentIndex(0);
           setSelectedOption(null);
           setQuizState('finished');
@@ -380,6 +437,7 @@ export default function QuizPage() {
           setSelectedOption(null);
           setQuizState('answering');
         } else {
+          setSelectedOption(null);
           setQuizState('finished');
         }
       }
@@ -424,7 +482,7 @@ export default function QuizPage() {
       </div>
     );
   }
-  if (!currentWord) return <div className="p-8 text-center text-gray-500">Loading Quiz...</div>;
+  if (!currentWord && quizState !== 'finished') return <div className="p-8 text-center text-gray-500">Loading Quiz...</div>;
 
   const activeTotal = isWrongReview ? wrongQueue.length : quizWords.length;
   const activePosition = activeTotal > 0 ? Math.min(currentIndex + 1, activeTotal) : 0;
@@ -723,7 +781,7 @@ export default function QuizPage() {
       </div>
 
       {/* Feedback Footer */}
-      <div className="h-32 flex items-center justify-center">
+      <div className="px-6 pb-6 pt-4 flex items-center justify-center">
         {(quizState === 'feedback' || currentIndex > 0) && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -731,6 +789,20 @@ export default function QuizPage() {
             className="w-full max-w-md flex flex-col items-center"
           >
             {quizState === 'feedback' && (
+              <QuizFeedbackPanel isCorrect={selectedOption === currentWord.id} className="mb-4 w-full">
+                <div className="rounded-3xl bg-white p-5 text-center shadow-sm dark:bg-gray-900/70">
+                  <div className="flex justify-center">
+                    <SegmentedSentence sentence={currentWord.word} hidePlayButton interactive={true} />
+                  </div>
+                  <div className="mt-3 text-base font-black text-blue-600 dark:text-blue-400">{currentWord.pinyin.toLowerCase()}</div>
+                  <p className="mt-1 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-400">
+                    {currentWord.meaning}
+                  </p>
+                </div>
+              </QuizFeedbackPanel>
+            )}
+
+            {false && quizState === 'feedback' && (
               <>
                 <div className={`mb-4 flex items-center gap-2 font-black uppercase tracking-tighter ${selectedOption === currentWord.id ? 'text-green-600' : 'text-red-600'}`}>
                   {selectedOption === currentWord.id ? (

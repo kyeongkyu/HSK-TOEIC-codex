@@ -6,10 +6,19 @@ import { Volume2, X, Star } from 'lucide-react';
 import { useSettings } from '@/hooks/use-settings';
 import { useUserWords } from '@/hooks/use-user-words';
 import { speak } from '@/lib/tts';
+import type { WordData } from '@/lib/srs';
 
 const PUNCTUATION = /^[\u3002\uFF0C\uFF1F\uFF01\u201C\u201D\u3001\uFF1A\uFF1B\s]+$/;
+const HANZI = /^[\u3400-\u9FFF]$/;
 
 const hskWordsMap = new Map(hskWords.map(w => [w.word, w]));
+
+type SentenceToken = {
+  text: string;
+  wordData: WordData | null;
+  isPunc: boolean;
+  isHanziFallback?: boolean;
+};
 
 export default function SegmentedSentence({ 
   sentence, 
@@ -35,7 +44,7 @@ export default function SegmentedSentence({
 
   const tokens = useMemo(() => {
     let i = 0;
-    const newTokens = [];
+    const newTokens: SentenceToken[] = [];
     while (i < sentence.length) {
       let match = null;
       // Try to find the longest matching word in the dictionary (max length 5)
@@ -53,7 +62,8 @@ export default function SegmentedSentence({
         i += match.word.length;
       } else {
         const char = sentence[i];
-        newTokens.push({ text: char, wordData: null, isPunc: PUNCTUATION.test(char) });
+        const isPunc = PUNCTUATION.test(char);
+        newTokens.push({ text: char, wordData: null, isPunc, isHanziFallback: !isPunc && HANZI.test(char) });
         i++;
       }
     }
@@ -78,10 +88,17 @@ export default function SegmentedSentence({
       {tokens.map((token, idx) => {
         const isLast = idx === tokens.length - 1;
         const nextIsPunc = tokens[idx + 1]?.isPunc;
+        const isInteractiveToken = interactive && (token.wordData || token.isHanziFallback);
+        const nextToken = tokens[idx + 1];
+        const shouldShowDivider =
+          Boolean(isInteractiveToken)
+          && !isLast
+          && !nextIsPunc
+          && Boolean(nextToken && (nextToken.wordData || nextToken.isHanziFallback));
 
         return (
           <span key={idx} className="relative flex items-center">
-            {token.wordData && interactive ? (
+            {isInteractiveToken ? (
               <span
                 role="button"
                 tabIndex={0}
@@ -104,38 +121,46 @@ export default function SegmentedSentence({
               <span style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>{token.text}</span>
             )}
 
-            {!token.isPunc && !isLast && !nextIsPunc && interactive && (
+            {shouldShowDivider && (
               <span className="mx-1.5 text-gray-300 dark:text-gray-700 text-sm font-light">/</span>
             )}
 
-            {activeToken === idx && token.wordData && (
+            {activeToken === idx && isInteractiveToken && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 bg-gray-800 dark:bg-gray-950 text-white p-4 rounded-2xl shadow-2xl z-50 text-center text-sm transform transition-all animate-in fade-in zoom-in duration-200">
                 <button onClick={(e) => { e.stopPropagation(); setActiveToken(null); }} className="absolute top-2 right-2 text-gray-400 hover:text-white">
                   <X size={16} />
                 </button>
-                <div className="text-2xl font-bold mb-1" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>{token.wordData.word}</div>
-                <div className="text-blue-300 dark:text-blue-400 font-medium text-base mb-2">{token.wordData.pinyin.toLowerCase()}</div>
-                <div className="mb-3 text-gray-100 dark:text-gray-200">{token.wordData.meaning}</div>
+                <div className="text-2xl font-bold mb-1" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>{token.wordData?.word ?? token.text}</div>
+                {token.wordData ? (
+                  <>
+                    <div className="text-blue-300 dark:text-blue-400 font-medium text-base mb-2">{token.wordData.pinyin.toLowerCase()}</div>
+                    <div className="mb-3 text-gray-100 dark:text-gray-200">{token.wordData.meaning}</div>
+                  </>
+                ) : (
+                  <div className="mb-3 text-gray-300 dark:text-gray-400">Tap to hear this character.</div>
+                )}
                 <div className="flex items-center justify-center gap-3">
                   <button
-                    onClick={(e) => playAudio(token.wordData.word, e)}
+                    onClick={(e) => playAudio(token.wordData?.word ?? token.text, e)}
                     className="flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full p-2.5 transition-colors"
                   >
                     <Volume2 size={18} />
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(token.wordData!.id);
-                    }}
-                    className={`flex items-center justify-center rounded-full p-2.5 transition-colors ${
-                      userWords[token.wordData.id]?.isFavorite 
-                        ? 'bg-yellow-400/30 text-yellow-400 hover:bg-yellow-400/40' 
-                        : 'bg-white/20 text-white hover:bg-white/30'
-                    }`}
-                  >
-                    <Star size={18} fill={userWords[token.wordData.id]?.isFavorite ? 'currentColor' : 'none'} />
-                  </button>
+                  {token.wordData && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(token.wordData!.id);
+                      }}
+                      className={`flex items-center justify-center rounded-full p-2.5 transition-colors ${
+                        userWords[token.wordData.id]?.isFavorite 
+                          ? 'bg-yellow-400/30 text-yellow-400 hover:bg-yellow-400/40' 
+                          : 'bg-white/20 text-white hover:bg-white/30'
+                      }`}
+                    >
+                      <Star size={18} fill={userWords[token.wordData.id]?.isFavorite ? 'currentColor' : 'none'} />
+                    </button>
+                  )}
                 </div>
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-800 dark:border-t-gray-950"></div>
               </div>

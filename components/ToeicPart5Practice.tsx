@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, CheckCircle2, RotateCcw, XCircle } from 'lucide-react';
 import {
@@ -12,6 +12,7 @@ import {
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { StatCard } from '@/components/ui/StatCard';
 import { getProgressPercent, readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot, shouldSaveActiveResumeSnapshot } from '@/lib/resume-task';
 
 type Part5Stats = Record<ToeicPart5Difficulty, {
   correct: number;
@@ -22,6 +23,15 @@ type Part5Stats = Record<ToeicPart5Difficulty, {
 
 type ToeicPart5PracticeProps = {
   onPracticeActiveChange?: (active: boolean) => void;
+};
+type ToeicPart5ResumeSnapshot = {
+  selectedDifficulty: ToeicPart5Difficulty | null;
+  currentIndex: number;
+  questionId?: string;
+  selectedChoice: string | null;
+  isAnswered: boolean;
+  reviewWrongOnly: boolean;
+  expandedDifficulty: ToeicPart5Difficulty | null;
 };
 
 const defaultStats: Part5Stats = {
@@ -81,6 +91,8 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
   const [reviewWrongOnly, setReviewWrongOnly] = useState(false);
   const [expandedDifficulty, setExpandedDifficulty] = useState<ToeicPart5Difficulty | null>(null);
   const [stats, setStats] = useState<Part5Stats>(defaultStats);
+  const resumeRestoredRef = useRef(false);
+  const resumeQuestionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const stored = readLocalStorageJson<unknown | null>(storageKey, null);
@@ -93,6 +105,26 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
   useEffect(() => {
     onPracticeActiveChange?.(selectedDifficulty !== null);
   }, [onPracticeActiveChange, selectedDifficulty]);
+
+  useEffect(() => {
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<ToeicPart5ResumeSnapshot>('/toeic-part5');
+      if (!snapshot) {
+        resumeRestoredRef.current = true;
+        return;
+      }
+      setSelectedDifficulty(snapshot.selectedDifficulty);
+      resumeQuestionIdRef.current = snapshot.questionId ?? null;
+      setCurrentIndex(Math.max(snapshot.currentIndex, 0));
+      setSelectedChoice(snapshot.selectedChoice);
+      setIsAnswered(snapshot.isAnswered);
+      setReviewWrongOnly(snapshot.reviewWrongOnly);
+      setExpandedDifficulty(snapshot.expandedDifficulty);
+      resumeRestoredRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, []);
 
   const saveStats = (nextStats: Part5Stats) => {
     setStats(nextStats);
@@ -124,6 +156,32 @@ export function ToeicPart5Practice({ onPracticeActiveChange }: ToeicPart5Practic
   }, [selectedDifficulty, reviewWrongOnly, stats]);
 
   const currentQuestion = questions[currentIndex];
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current || !resumeQuestionIdRef.current || questions.length === 0) return;
+    const nextIndex = questions.findIndex(question => question.id === resumeQuestionIdRef.current);
+    resumeQuestionIdRef.current = null;
+    if (nextIndex !== -1 && nextIndex !== currentIndex) {
+      setCurrentIndex(nextIndex);
+    } else if (currentIndex > questions.length - 1) {
+      setCurrentIndex(Math.max(questions.length - 1, 0));
+    }
+  }, [currentIndex, questions]);
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current) return;
+    const isActiveQuestion = Boolean(selectedDifficulty) && Boolean(currentQuestion);
+    if (!shouldSaveActiveResumeSnapshot(isActiveQuestion, questions.length > 0)) return;
+    setResumeTaskSnapshot('/toeic-part5', 'TOEIC Part 5', {
+      selectedDifficulty,
+      currentIndex,
+      questionId: currentQuestion?.id,
+      selectedChoice,
+      isAnswered,
+      reviewWrongOnly,
+      expandedDifficulty,
+    } satisfies ToeicPart5ResumeSnapshot);
+  }, [currentIndex, currentQuestion, expandedDifficulty, isAnswered, questions.length, reviewWrongOnly, selectedChoice, selectedDifficulty]);
 
   const chooseDifficulty = (difficulty: ToeicPart5Difficulty, mode: 'resume' | 'restart' = 'restart') => {
     const questionCount = getDifficultyQuestionCount(difficulty);

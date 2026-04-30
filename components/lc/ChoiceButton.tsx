@@ -1,6 +1,6 @@
 'use client';
 
-import { LcChoiceId } from '@/data/toeic-lc-part2';
+import type { LcChoiceId } from '@/data/toeic-lc-part2';
 
 type ChoiceButtonProps = {
   id: LcChoiceId;

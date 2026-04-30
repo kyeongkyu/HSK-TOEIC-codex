@@ -16,6 +16,8 @@ import { useTTS } from '@/hooks/useTTS';
 import { ChoiceButton } from './ChoiceButton';
 import { LcCategoryCard, LcCategoryGrid } from './LcCategoryGrid';
 import { ReviewPanel } from './ReviewPanel';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot, shouldSaveActiveResumeSnapshot } from '@/lib/resume-task';
+import { findQuestionIndexById } from '@/features/listening/session';
 
 type ListeningQuizProps = {
   onPracticeActiveChange?: (active: boolean) => void;
@@ -44,6 +46,19 @@ type LcQuestionSnapshot = {
   selectedAnswer: LcChoiceId | null;
   submitted: boolean;
   showTranscript: boolean;
+};
+type ToeicPart2ResumeSnapshot = {
+  selectedKind: LcFilterKind | null;
+  selectedValue: LcFilterValue | null;
+  currentIndex: number;
+  questionId?: string;
+  selectedAnswer: LcChoiceId | null;
+  submitted: boolean;
+  showTranscript: boolean;
+  isComplete: boolean;
+  sessionResults: LcAttemptRecord[];
+  sessionPlayCounts: Record<string, number>;
+  questionHistory: Array<LcQuestionSnapshot | null>;
 };
 
 const STORAGE_KEY = 'toeic_lc_part2_progress';
@@ -131,6 +146,9 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
   const [sessionPlayCounts, setSessionPlayCounts] = useState<Record<string, number>>({});
   const [questionHistory, setQuestionHistory] = useState<Array<LcQuestionSnapshot | null>>([]);
   const questionStartRef = useRef(0);
+  const resumeRestoredRef = useRef(false);
+  const resumeRestoreInFlightRef = useRef(false);
+  const resumeQuestionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const hydrateTimeoutId = window.setTimeout(() => {
@@ -148,6 +166,12 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
   }, []);
 
   useEffect(() => {
+    if (resumeRestoreInFlightRef.current) {
+      resumeRestoreInFlightRef.current = false;
+      questionStartRef.current = Date.now();
+      stopTts();
+      return;
+    }
     questionStartRef.current = Date.now();
     stopTts();
   }, [currentIndex, selectedValue, stopTts]);
@@ -224,6 +248,62 @@ export function ListeningQuiz({ onPracticeActiveChange }: ListeningQuizProps) {
   const remainingPlays = Number.isFinite(maxPlayCount) ? Math.max(maxPlayCount - currentPlayCount, 0) : Infinity;
   const isBookmarked = currentQuestion ? progress.bookmarkedIds.includes(currentQuestion.id) : false;
   const isCorrect = Boolean(currentQuestion && selectedAnswer === currentQuestion.answer);
+
+  useEffect(() => {
+    if (resumeRestoredRef.current) return;
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<ToeicPart2ResumeSnapshot>('/toeic-part2');
+      if (!snapshot) {
+        resumeRestoredRef.current = true;
+        return;
+      }
+
+      resumeRestoreInFlightRef.current = true;
+      setSelectedKind(snapshot.selectedKind);
+      setSelectedValue(snapshot.selectedValue);
+      resumeQuestionIdRef.current = snapshot.questionId ?? null;
+      setCurrentIndex(Math.max(snapshot.currentIndex, 0));
+      setSelectedAnswer(snapshot.selectedAnswer);
+      setSubmitted(snapshot.submitted);
+      setShowTranscript(snapshot.showTranscript);
+      setIsComplete(snapshot.isComplete);
+      setSessionResults(snapshot.sessionResults);
+      setSessionPlayCounts(snapshot.sessionPlayCounts);
+      setQuestionHistory(snapshot.questionHistory);
+      resumeRestoredRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, []);
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current || !resumeQuestionIdRef.current || questions.length === 0) return;
+    const nextIndex = findQuestionIndexById(questions, resumeQuestionIdRef.current);
+    resumeQuestionIdRef.current = null;
+    if (nextIndex !== -1 && nextIndex !== currentIndex) {
+      resumeRestoreInFlightRef.current = true;
+      setCurrentIndex(nextIndex);
+    }
+  }, [currentIndex, questions]);
+
+  useEffect(() => {
+    if (!resumeRestoredRef.current) return;
+    const isActiveQuestion = Boolean(selectedKind) && Boolean(selectedValue) && Boolean(currentQuestion) && !isComplete;
+    if (!shouldSaveActiveResumeSnapshot(isActiveQuestion)) return;
+    setResumeTaskSnapshot('/toeic-part2', 'TOEIC Part 2', {
+      selectedKind,
+      selectedValue,
+      currentIndex,
+      questionId: currentQuestion?.id,
+      selectedAnswer,
+      submitted,
+      showTranscript,
+      isComplete,
+      sessionResults,
+      sessionPlayCounts,
+      questionHistory,
+    } satisfies ToeicPart2ResumeSnapshot);
+  }, [currentIndex, currentQuestion, isComplete, questionHistory, selectedAnswer, selectedKind, selectedValue, sessionPlayCounts, sessionResults, showTranscript, submitted]);
 
   const resetQuestionState = () => {
     setSelectedAnswer(null);

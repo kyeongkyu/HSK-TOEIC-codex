@@ -11,8 +11,17 @@ import SegmentedSentence from '@/components/SegmentedSentence';
 import { Volume2, ChevronLeft, ChevronRight, X, List, Info, Star, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { speak } from '@/lib/tts';
+import { getResumeTaskSnapshot } from '@/lib/resume-task';
+import { useResumeSnapshot } from '@/hooks/use-resume-snapshot';
 
 import { Suspense } from 'react';
+
+type StudyResumeSnapshot = {
+  selectedTopicId: string | null;
+  viewMode: 'focus' | 'list';
+  currentIndex: number;
+  wordId?: string;
+};
 
 const getFocusHanziTextSize = (word: string, hanziSize: number) => {
   const length = Array.from(word).length;
@@ -49,6 +58,8 @@ function StudyContent() {
   const [listReturnHighlightId, setListReturnHighlightId] = useState<string | null>(null);
   const listItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
+  const resumeRestoredRef = useRef(false);
+  const [resumeRestored, setResumeRestored] = useState(false);
 
   const categories = useMemo(() => {
     const levelNum = Number(selectedLevel);
@@ -72,6 +83,64 @@ function StudyContent() {
     }
     return words;
   }, [selectedLevel, settingsLoaded, selectedTopicId, categories]);
+
+  useEffect(() => {
+    if (!settingsLoaded || !wordsLoaded || resumeRestoredRef.current) return;
+
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<StudyResumeSnapshot>('/study');
+      if (!snapshot) {
+        resumeRestoredRef.current = true;
+        setResumeRestored(true);
+        return;
+      }
+
+      if (categories && !snapshot.selectedTopicId) {
+        resumeRestoredRef.current = true;
+        setResumeRestored(true);
+        return;
+      }
+
+      if (snapshot.selectedTopicId !== selectedTopicId) {
+        setSelectedTopicId(snapshot.selectedTopicId);
+        return;
+      }
+
+      if (filteredWords.length === 0) return;
+
+      const nextIndex = snapshot.wordId
+        ? filteredWords.findIndex(word => word.id === snapshot.wordId)
+        : snapshot.currentIndex;
+      setCurrentIndex(Math.min(Math.max(nextIndex === -1 ? snapshot.currentIndex : nextIndex, 0), filteredWords.length - 1));
+      setViewMode(snapshot.viewMode ?? 'focus');
+      if ((snapshot.viewMode ?? 'focus') === 'list') {
+        setPendingListFocusWordId(snapshot.wordId ?? filteredWords[nextIndex]?.id ?? null);
+      }
+      resumeRestoredRef.current = true;
+      setResumeRestored(true);
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [categories, filteredWords, selectedTopicId, settingsLoaded, wordsLoaded]);
+
+  const resumeSnapshot = useMemo<StudyResumeSnapshot | null>(() => {
+    const currentWord = filteredWords[currentIndex] ?? filteredWords[0];
+    return currentWord ? {
+      selectedTopicId,
+      viewMode,
+      currentIndex,
+      wordId: currentWord.id,
+    } : null;
+  }, [currentIndex, filteredWords, selectedTopicId, viewMode]);
+
+  useResumeSnapshot({
+    route: '/study',
+    label: 'Browse',
+    snapshot: resumeSnapshot,
+    enabled: settingsLoaded && wordsLoaded && resumeRestored,
+    active: !categories || Boolean(selectedTopicId),
+    hasContent: filteredWords.length > 0,
+  });
 
   useEffect(() => {
     if (wordIdParam && filteredWords.length > 0) {

@@ -1,14 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, 
   Volume2, 
-  CheckCircle2, 
-  XCircle, 
   ChevronRight, 
   Trophy, 
   Sparkles,
@@ -20,6 +18,10 @@ import { speak } from '@/lib/tts';
 import { useSettings } from '@/hooks/use-settings';
 import { useSentenceProgress } from '@/hooks/use-sentence-progress';
 import SegmentedSentence from '@/components/SegmentedSentence';
+import { ProgressMeter } from '@/components/ui/ProgressMeter';
+import { QuizFeedbackPanel } from '@/components/ui/QuizFeedbackPanel';
+import { getProgressPercent } from '@/lib/ui-state';
+import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 
 type ProblemType = 'A' | 'B' | 'C';
 
@@ -31,6 +33,17 @@ interface QuizQuestion {
   shuffledTokens: string[]; // For Type B and C
 }
 
+type SentenceCompletionResumeSnapshot = {
+  questions: QuizQuestion[];
+  currentIndex: number;
+  quizState: 'answering' | 'feedback';
+  selectedOption: string | null;
+  userTokens: string[];
+  shuffledTokens: string[];
+  score: number;
+  totalErrors: number;
+};
+
 export default function SentenceCompletionQuiz() {
   const params = useParams();
   const router = useRouter();
@@ -38,6 +51,7 @@ export default function SentenceCompletionQuiz() {
   const chapterId = parseInt(params.chapter as string);
   const { ttsSpeed, hanziFont } = useSettings();
   const { updateProgress } = useSentenceProgress();
+  const resumeRoute = `/sentence-completion/${level}/${chapterId}`;
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -49,6 +63,7 @@ export default function SentenceCompletionQuiz() {
   const [totalErrors, setTotalErrors] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
+  const resumeHydratedRef = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(`sentence-completion-progress-${level}-${chapterId}`);
@@ -121,7 +136,44 @@ export default function SentenceCompletionQuiz() {
     setQuestions(generatedQuestions);
   }, [level, chapterId]);
 
+  useEffect(() => {
+    const restoreId = window.setTimeout(() => {
+      const snapshot = getResumeTaskSnapshot<SentenceCompletionResumeSnapshot>(resumeRoute);
+      if (!snapshot || snapshot.questions.length === 0) {
+        resumeHydratedRef.current = true;
+        return;
+      }
+
+      setQuestions(snapshot.questions);
+      setCurrentIndex(Math.min(Math.max(snapshot.currentIndex, 0), snapshot.questions.length - 1));
+      setQuizState(snapshot.quizState);
+      setSelectedOption(snapshot.selectedOption);
+      setUserTokens(snapshot.userTokens);
+      setShuffledTokens(snapshot.shuffledTokens);
+      setScore(snapshot.score);
+      setTotalErrors(snapshot.totalErrors);
+      setShowResumeModal(false);
+      resumeHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(restoreId);
+  }, [resumeRoute]);
+
   const currentQuestion = questions[currentIndex];
+
+  useEffect(() => {
+    if (!resumeHydratedRef.current || questions.length === 0 || quizState === 'finished') return;
+    setResumeTaskSnapshot(resumeRoute, 'Sentence', {
+      questions,
+      currentIndex,
+      quizState,
+      selectedOption,
+      userTokens,
+      shuffledTokens,
+      score,
+      totalErrors,
+    } satisfies SentenceCompletionResumeSnapshot);
+  }, [currentIndex, questions, quizState, resumeRoute, score, selectedOption, shuffledTokens, totalErrors, userTokens]);
 
   const isCorrect = useMemo(() => {
     if (!currentQuestion) return false;
@@ -323,31 +375,36 @@ export default function SentenceCompletionQuiz() {
     );
   }
 
+  const activeTotal = questions.length;
+  const activePosition = activeTotal > 0 ? Math.min(currentIndex + 1, activeTotal) : 0;
+  const activeProgressPercent = getProgressPercent(activePosition, activeTotal);
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col transition-colors duration-200">
       {/* Header */}
-      <div className="p-6 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+      <div className="p-6 flex items-center justify-between">
         <button 
           onClick={() => router.push(`/sentence-completion/${level}`)}
           className="p-2 -ml-2 text-gray-500 hover:text-black dark:hover:text-white transition-colors"
         >
           <ArrowLeft size={24} />
         </button>
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
-            Chapter {chapterId}
-          </span>
-          <div className="flex gap-1">
-            {questions.map((_, i) => (
-              <div 
-                key={i} 
-                className={`h-1 rounded-full transition-all duration-300 ${
-                  i < currentIndex ? 'w-3 bg-blue-500' : 
-                  i === currentIndex ? 'w-6 bg-blue-600' : 'w-1.5 bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-            ))}
+        <div className="flex min-w-0 flex-1 flex-col items-center px-3">
+          <div className="mb-2 flex w-full max-w-[220px] items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+              Chapter {chapterId}
+            </span>
+            <span className="shrink-0 text-[10px] font-black text-blue-600 dark:text-blue-400 tabular-nums leading-none">
+              {activePosition}/{activeTotal} · {activeProgressPercent}%
+            </span>
           </div>
+          <ProgressMeter
+            className="w-full max-w-[220px]"
+            percent={activeProgressPercent}
+            ariaLabel="Sentence completion progress"
+            trackClassName="bg-gray-100 dark:bg-gray-800"
+            fillClassName="bg-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.35)] duration-300 ease-out dark:bg-blue-400"
+          />
         </div>
         <div className="w-10" />
       </div>
@@ -504,9 +561,9 @@ export default function SentenceCompletionQuiz() {
               <div className="min-h-[100px] p-6 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 items-center justify-center" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
                 {quizState === 'feedback' ? (
                   <SegmentedSentence 
-                    sentence={userTokens.join('')} 
+                    sentence={currentQuestion.type === 'B' ? userTokens.join(' ') : userTokens.join('')} 
                     hidePlayButton 
-                    interactive={true}
+                    interactive={currentQuestion.type !== 'B'}
                   />
                 ) : (
                   <>
@@ -572,34 +629,22 @@ export default function SentenceCompletionQuiz() {
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-12 pt-8 border-t border-gray-100 dark:border-gray-800"
+              className="mt-10"
             >
-              <div className="flex flex-col items-center gap-6">
-                <div className="flex items-center gap-4 w-full">
-                  {isCorrect ? (
-                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-500/20 shrink-0">
-                      <CheckCircle2 size={28} />
-                    </div>
-                  ) : (
-                    <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-red-500/20 shrink-0">
-                      <XCircle size={28} />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col items-start gap-1">
-                      <div style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
-                        <SegmentedSentence sentence={currentQuestion.sentence.chinese} interactive={true} />
-                      </div>
-                      <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-                        {currentQuestion.sentence.korean}
-                      </p>
-                    </div>
+              <QuizFeedbackPanel isCorrect={isCorrect}>
+                <div className="flex flex-col items-center gap-5">
+                <div className="w-full rounded-3xl bg-white p-5 text-center shadow-sm dark:bg-gray-900/70">
+                  <div className="flex justify-center">
+                    <SegmentedSentence sentence={currentQuestion.sentence.chinese} interactive={true} />
                   </div>
+                  <p className="mt-3 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-400">
+                    {currentQuestion.sentence.korean}
+                  </p>
                 </div>
                 
                 <button 
                   onClick={handleNext}
-                  className={`w-full py-5 rounded-3xl font-black text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 ${
                     isCorrect 
                       ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-600/20' 
                       : 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
@@ -608,6 +653,7 @@ export default function SentenceCompletionQuiz() {
                   다음 문제 <ChevronRight size={20} />
                 </button>
               </div>
+              </QuizFeedbackPanel>
             </motion.div>
           )}
         </AnimatePresence>
