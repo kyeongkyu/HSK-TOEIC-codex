@@ -63,7 +63,7 @@ export default function LibraryPage() {
   if (!isLoaded || !isWordDataLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
+    <div className="px-4 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
       {/* Header */}
       <div className="pt-10 mb-10">
         <div className="flex items-center justify-between mb-6">

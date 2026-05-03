@@ -223,8 +223,8 @@ export default function QuizPage() {
       score,
       isWrongReview,
       wrongQueueIds: wrongQueue.map(word => word.id),
-    } satisfies QuizResumeSnapshot);
-  }, [currentIndex, isWrongReview, quizState, resumeRoute, score, selectedOption, settingsLoaded, wrongQueue]);
+    } satisfies QuizResumeSnapshot, { taskKey: 'hsk-quiz', levelScope: selectedLevel });
+  }, [currentIndex, isWrongReview, quizState, resumeRoute, score, selectedLevel, selectedOption, settingsLoaded, wrongQueue]);
 
   const currentWord = useMemo(() => {
     if (isWrongReview) {

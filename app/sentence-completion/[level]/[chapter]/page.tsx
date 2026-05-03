@@ -172,8 +172,8 @@ export default function SentenceCompletionQuiz() {
       shuffledTokens,
       score,
       totalErrors,
-    } satisfies SentenceCompletionResumeSnapshot);
-  }, [currentIndex, questions, quizState, resumeRoute, score, selectedOption, shuffledTokens, totalErrors, userTokens]);
+    } satisfies SentenceCompletionResumeSnapshot, { taskKey: 'hsk-sentence', levelScope: level });
+  }, [currentIndex, level, questions, quizState, resumeRoute, score, selectedOption, shuffledTokens, totalErrors, userTokens]);
 
   const isCorrect = useMemo(() => {
     if (!currentQuestion) return false;

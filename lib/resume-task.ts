@@ -20,6 +20,7 @@ export type ResumeTaskMeta = {
   label: string;
   route: string;
   updatedAt: number;
+  levelScope?: number | 'all';
 };
 type ResumeTaskDefinition = Omit<ResumeTaskMeta, 'updatedAt'> & {
   matchesRoute: (baseRoute: string) => boolean;
@@ -87,8 +88,15 @@ function shouldSkipResume(route: string) {
   return matches;
 }
 
-export function setResumeTaskSnapshot(route: string, label: string, snapshot: unknown, taskKey?: ResumeTaskKey) {
+type ResumeTaskOptions = {
+  taskKey?: ResumeTaskKey;
+  levelScope?: number | 'all';
+};
+
+export function setResumeTaskSnapshot(route: string, label: string, snapshot: unknown, taskKeyOrOptions?: ResumeTaskKey | ResumeTaskOptions) {
   if (typeof window === 'undefined') return;
+  const options = typeof taskKeyOrOptions === 'string' ? { taskKey: taskKeyOrOptions } : taskKeyOrOptions;
+  const taskKey = options?.taskKey;
 
   const snapshots = readJsonRecord<unknown>(RESUME_TASK_SNAPSHOTS_KEY);
   snapshots[route] = snapshot;
@@ -105,7 +113,7 @@ export function setResumeTaskSnapshot(route: string, label: string, snapshot: un
 
   if (meta) {
     const metadata = readJsonRecord<ResumeTaskMeta>(RESUME_TASK_META_KEY);
-    metadata[meta.taskKey] = { ...meta, updatedAt: Date.now() };
+    metadata[meta.taskKey] = { ...meta, levelScope: options?.levelScope, updatedAt: Date.now() };
     writeLocalStorageJson(RESUME_TASK_META_KEY, metadata);
   }
 

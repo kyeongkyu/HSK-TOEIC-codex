@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useSettings } from '@/hooks/use-settings';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, ChevronDown, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 
 type ResetScope = 'hsk' | 'toeic';
@@ -36,6 +36,7 @@ export default function SettingsPage() {
   } = useSettings();
   const [resetScope, setResetScope] = useState<ResetScope | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [isHanziFontMenuOpen, setIsHanziFontMenuOpen] = useState(false);
 
   if (!isLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;
 
@@ -77,7 +78,7 @@ export default function SettingsPage() {
             'hsk_sentence_study_bookmarks',
             'sentence_completion_progress'
           ]
-        : ['toeic_part5_stats', 'toeic_lc_part2_progress'];
+        : ['toeic_part5_stats', 'toeic_lc_part2_progress', 'toeic_tts_speed'];
 
     keysToRemove.forEach(key => localStorage.removeItem(key));
 
@@ -98,17 +99,18 @@ export default function SettingsPage() {
     window.location.href = '/';
   };
 
-  const ttsSpeedLabels = ['아주 느림', '느림', '보통', '빠름', '아주 빠름'];
+  const ttsSpeedLabels = ['\uC544\uC8FC \uB290\uB9BC', '\uB290\uB9BC', '\uBCF4\uD1B5', '\uBE60\uB984', '\uC544\uC8FC \uBE60\uB984'];
 
   const hanziFonts = [
-    { name: 'Noto Serif SC', label: 'Noto Serif SC', desc: '명조체 (기본)' },
-    { name: 'Noto Sans SC', label: 'Noto Sans SC', desc: '고딕체' },
-    { name: 'Ma Shan Zheng', label: 'Ma Shan Zheng', desc: '붓글씨체' },
-    { name: 'Source Han Sans', label: 'Source Han Sans', desc: '고딕체 (Source)' },
-    { name: 'PingFang SC', label: 'PingFang SC', desc: '애플 고딕체' },
+    { name: 'Noto Serif SC', label: 'Noto Serif SC', desc: '\uBA85\uC870\uCCB4 (\uAE30\uBCF8)' },
+    { name: 'Noto Sans SC', label: 'Noto Sans SC', desc: '\uACE0\uB515\uCCB4' },
+    { name: 'Ma Shan Zheng', label: 'Ma Shan Zheng', desc: '\uBD93\uAE00\uC528\uCCB4' },
+    { name: 'Source Han Sans', label: 'Source Han Sans', desc: '\uACE0\uB515\uCCB4 (Source)' },
+    { name: 'PingFang SC', label: 'PingFang SC', desc: '\uC560\uD50C \uACE0\uB515\uCCB4' },
   ];
 
-  const hanziSizeLabels = ['작게', '중간', '크게 (기본)'];
+  const currentHanziFont = hanziFonts.find(font => font.name === hanziFont) ?? hanziFonts[0];
+  const hanziSizeLabels = ['\uC791\uAC8C', '\uC911\uAC04', '\uD06C\uAC8C (\uAE30\uBCF8)'];
 
   const renderThemeMode = () => (
     <section>
@@ -136,6 +138,38 @@ export default function SettingsPage() {
               );
             })}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderTtsSpeedSection = () => (
+    <section>
+      <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Audio Speed</h2>
+      <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
+        <div className="flex flex-col gap-6">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-bold text-black dark:text-white">TTS Speed</span>
+            <span className="text-sm font-bold text-blue-600 dark:text-blue-400 italic">{ttsSpeedLabels[ttsSpeed - 1]}</span>
+          </div>
+          <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 p-1.5 rounded-full">
+            {[1, 2, 3, 4, 5].map((level) => (
+              <button
+                key={level}
+                onClick={() => setTtsSpeed(level)}
+                className={`flex-1 py-3 rounded-full text-sm font-bold transition-all active:scale-[0.98] transform-gpu ${
+                  ttsSpeed === level
+                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic">
+            Adjust the pronunciation speed for the current mode.
+          </p>
         </div>
       </div>
     </section>
@@ -204,7 +238,7 @@ export default function SettingsPage() {
 
   if (appMode === 'toeic') {
     return (
-      <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
+      <div className="px-4 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
         <div className="pt-10 mb-10 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Preferences</span>
@@ -213,6 +247,7 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-10">
           {renderThemeMode()}
+          {renderTtsSpeedSection()}
           {renderResetSection('toeic')}
         </div>
         {renderResetModal()}
@@ -221,7 +256,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="px-6 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
+    <div className="px-4 flex flex-col flex-1 bg-white dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
       <div className="pt-10 mb-10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Preferences</span>
         <h1 className="text-4xl font-black text-black dark:text-white">Settings</h1>
@@ -230,35 +265,7 @@ export default function SettingsPage() {
       <div className="space-y-10">
         {renderThemeMode()}
 
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Audio Speed</h2>
-          <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
-            <div className="flex flex-col gap-6">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-black dark:text-white">TTS Speed</span>
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 italic">{ttsSpeedLabels[ttsSpeed - 1]}</span>
-              </div>
-              <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 p-1.5 rounded-full">
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setTtsSpeed(level)}
-                    className={`flex-1 py-3 rounded-full text-sm font-bold transition-all active:scale-[0.98] transform-gpu ${
-                      ttsSpeed === level
-                        ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-md'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic">
-                Adjust the pronunciation speed for words and sentences.
-              </p>
-            </div>
-          </div>
-        </section>
+        {renderTtsSpeedSection()}
         
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Display</h2>
@@ -350,25 +357,81 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Hanzi Font</h2>
           <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-4">
-            <div className="flex flex-col gap-2">
-              {hanziFonts.map((font) => (
+            <button
+              type="button"
+              onClick={() => setIsHanziFontMenuOpen(open => !open)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition-all duration-300 ease-out hover:shadow-md active:scale-[0.99] dark:border-gray-700 dark:bg-gray-900"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-2xl font-black text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"
+                  style={{ fontFamily: `"${currentHanziFont.name}", sans-serif` }}
+                >
+                  {'\u6C49'}
+                </div>
+                <div className="min-w-0">
+                  <span className="block truncate text-lg font-black text-black dark:text-white" style={{ fontFamily: `"${currentHanziFont.name}", sans-serif` }}>
+                    {currentHanziFont.label}
+                  </span>
+                  <span className="mt-1 block text-xs font-bold text-gray-500 dark:text-gray-400">
+                    {currentHanziFont.desc}
+                  </span>
+                </div>
+              </div>
+              <ChevronDown
+                size={20}
+                className={`shrink-0 text-gray-400 transition-transform duration-300 ease-out ${isHanziFontMenuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <div
+              className={`grid transition-[grid-template-rows,opacity,transform,margin] duration-300 ease-out ${
+                isHanziFontMenuOpen
+                  ? 'mt-3 grid-rows-[1fr] translate-y-0 opacity-100'
+                  : 'mt-0 grid-rows-[0fr] -translate-y-2 opacity-0 pointer-events-none'
+              }`}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div className="flex origin-top flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg shadow-black/5 transition-transform duration-300 ease-out dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/20">
+                {hanziFonts.map((font) => (
                 <button
                   key={font.name}
-                  onClick={() => setHanziFont(font.name)}
-                  className={`flex flex-col items-start px-4 py-3 rounded-2xl transition-all active:scale-[0.99] transform-gpu ${
+                  type="button"
+                  onClick={() => {
+                    setHanziFont(font.name);
+                    setIsHanziFontMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition-all active:scale-[0.99] transform-gpu ${
                     hanziFont === font.name
-                      ? 'bg-blue-600 dark:bg-blue-500 text-white shadow-lg shadow-blue-600/20'
-                      : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 dark:bg-blue-500'
+                      : 'text-black hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800'
                   }`}
                 >
-                  <span className="font-bold text-lg" style={{ fontFamily: `"${font.name}", sans-serif` }}>
-                    {font.label}
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl font-black ${
+                        hanziFont === font.name
+                          ? 'bg-white/15 text-white'
+                          : 'bg-gray-100 text-blue-600 dark:bg-gray-800 dark:text-blue-300'
+                      }`}
+                      style={{ fontFamily: `"${font.name}", sans-serif` }}
+                    >
+                      {'\u6C49'}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black" style={{ fontFamily: `"${font.name}", sans-serif` }}>
+                        {font.label}
+                      </span>
+                      <span className={`mt-0.5 block text-xs font-bold ${hanziFont === font.name ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {font.desc}
+                      </span>
+                    </span>
                   </span>
-                  <span className={`text-xs mt-1 ${hanziFont === font.name ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                    {font.desc}
-                  </span>
+                  {hanziFont === font.name && <Check size={18} className="shrink-0" />}
                 </button>
-              ))}
+                ))}
+                </div>
+              </div>
             </div>
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center italic mt-4">
               Choose your preferred font for Chinese characters.

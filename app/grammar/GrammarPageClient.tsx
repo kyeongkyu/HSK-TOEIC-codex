@@ -339,8 +339,8 @@ export default function GrammarPageClient() {
       activePointId,
       answerState,
       scrollY: window.scrollY,
-    } satisfies GrammarResumeSnapshot);
-  }, [activePointId, answerState, isLoaded]);
+    } satisfies GrammarResumeSnapshot, { taskKey: 'hsk-grammar', levelScope: selectedLevel });
+  }, [activePointId, answerState, isLoaded, selectedLevel]);
 
   useEffect(() => {
     if (!isLoaded || !restoredRef.current || !shouldSaveActiveResumeSnapshot(Boolean(activePointId))) return;
@@ -352,7 +352,7 @@ export default function GrammarPageClient() {
           activePointId,
           answerState,
           scrollY: window.scrollY,
-        } satisfies GrammarResumeSnapshot);
+        } satisfies GrammarResumeSnapshot, { taskKey: 'hsk-grammar', levelScope: selectedLevel });
       });
     };
 
@@ -361,7 +361,7 @@ export default function GrammarPageClient() {
       window.cancelAnimationFrame(frameId);
       window.removeEventListener('scroll', saveScrollSnapshot);
     };
-  }, [activePointId, answerState, isLoaded]);
+  }, [activePointId, answerState, isLoaded, selectedLevel]);
 
   if (!isLoaded) {
     return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;

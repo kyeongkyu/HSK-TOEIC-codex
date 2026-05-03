@@ -145,6 +145,8 @@ export default function MemorizePage() {
     enabled: wordsLoaded && settingsLoaded && now !== null && resumeRestored,
     active: isReviewing && (!categories || Boolean(selectedTopicId)),
     hasContent: activeWords.length > 0,
+    taskKey: 'hsk-memorize',
+    levelScope: selectedLevel,
   });
 
   if (!wordsLoaded || !settingsLoaded || now === null) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;

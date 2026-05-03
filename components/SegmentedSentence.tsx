@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { hskWords } from '@/data/hsk';
 import { Volume2, X, Star } from 'lucide-react';
 import { useSettings } from '@/hooks/use-settings';
@@ -12,6 +13,9 @@ const PUNCTUATION = /^[\u3002\uFF0C\uFF1F\uFF01\u201C\u201D\u3001\uFF1A\uFF1B\s]
 const HANZI = /^[\u3400-\u9FFF]$/;
 
 const hskWordsMap = new Map(hskWords.map(w => [w.word, w]));
+const POPUP_WIDTH = 192;
+const POPUP_MARGIN = 12;
+const POPUP_GAP = 10;
 
 type SentenceToken = {
   text: string;
@@ -36,6 +40,11 @@ export default function SegmentedSentence({
   const { ttsSpeed, hanziFont } = useSettings();
   const { userWords, toggleFavorite } = useUserWords();
   const [activeToken, setActiveToken] = useState<number | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ left: number; top: number; placement: 'top' | 'bottom' } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const tokenRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const suppressOpenRef = useRef(false);
+  const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const containerClasses =
     variant === 'quizPrompt'
@@ -71,19 +80,176 @@ export default function SegmentedSentence({
   }, [sentence]);
 
   useEffect(() => {
+    setIsMounted(true);
+
+    return () => {
+      if (suppressTimerRef.current) {
+        clearTimeout(suppressTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     setActiveToken(null);
   }, [sentence]);
+
+  useEffect(() => {
+    if (activeToken === null) {
+      setPopupPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const target = tokenRefs.current[activeToken];
+      if (!target) return;
+
+      const rect = target.getBoundingClientRect();
+      const left = Math.min(
+        Math.max(rect.left + rect.width / 2, POPUP_WIDTH / 2 + POPUP_MARGIN),
+        window.innerWidth - POPUP_WIDTH / 2 - POPUP_MARGIN,
+      );
+      const estimatedHeight = tokens[activeToken]?.wordData ? 172 : 132;
+      const canOpenAbove = rect.top - estimatedHeight - POPUP_GAP > POPUP_MARGIN;
+
+      setPopupPosition({
+        left,
+        top: canOpenAbove ? rect.top - POPUP_GAP : rect.bottom + POPUP_GAP,
+        placement: canOpenAbove ? 'top' : 'bottom',
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [activeToken, tokens]);
 
   const playAudio = (text: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     speak(text, ttsSpeed);
   };
 
+  const closePopup = () => {
+    suppressOpenRef.current = true;
+    if (suppressTimerRef.current) {
+      clearTimeout(suppressTimerRef.current);
+    }
+    suppressTimerRef.current = setTimeout(() => {
+      suppressOpenRef.current = false;
+    }, 250);
+    setActiveToken(null);
+  };
+
+  const togglePopup = (idx: number) => {
+    if (suppressOpenRef.current) return;
+    setActiveToken(activeToken === idx ? null : idx);
+  };
+
+  const activeTokenData = activeToken !== null ? tokens[activeToken] : null;
+  const activeTokenIsInteractive = Boolean(activeTokenData && interactive && (activeTokenData.wordData || activeTokenData.isHanziFallback));
+
+  const popupLayer = isMounted && activeTokenData && activeTokenIsInteractive && popupPosition
+    ? createPortal(
+      <>
+        <div className="fixed inset-0 z-[70]" onClick={closePopup} />
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-[80] w-60 max-w-[calc(100vw-3rem)] rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-2xl shadow-black/10 transition-all animate-in fade-in zoom-in-95 duration-200 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/40"
+          style={{
+            left: popupPosition!.left,
+            top: popupPosition!.top,
+            transform: popupPosition!.placement === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+          }}
+        >
+          <button
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              closePopup();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              closePopup();
+            }}
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+            aria-label="Close word popup"
+          >
+            <X size={14} />
+          </button>
+
+          <div className="pr-8">
+            <div className="text-lg font-black text-black dark:text-white" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>
+                {activeTokenData!.wordData?.word ?? activeTokenData!.text}
+            </div>
+
+            {activeTokenData!.wordData ? (
+              <>
+                <div className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-400">
+                  {activeTokenData!.wordData!.pinyin.toLowerCase()}
+                </div>
+                <div className="mt-2 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-300">
+                  {activeTokenData!.wordData!.meaning}
+                </div>
+              </>
+            ) : (
+              <div className="mt-2 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-300">
+                단일 한자 듣기
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={(e) => playAudio(activeTokenData!.wordData?.word ?? activeTokenData!.text, e)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-95 transition-all"
+            >
+              <Volume2 size={15} />
+              <span>TTS</span>
+            </button>
+            {activeTokenData!.wordData && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(activeTokenData!.wordData!.id);
+                }}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black active:scale-95 transition-all ${
+                  userWords[activeTokenData!.wordData!.id]?.isFavorite
+                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-500/15 dark:text-yellow-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                }`}
+              >
+                <Star size={15} fill={userWords[activeTokenData!.wordData!.id]?.isFavorite ? 'currentColor' : 'none'} />
+                <span>{userWords[activeTokenData!.wordData!.id]?.isFavorite ? 'Saved' : 'Library'}</span>
+              </button>
+            )}
+          </div>
+          <div
+            className={`absolute left-1/2 -translate-x-1/2 border-[6px] border-transparent ${
+              popupPosition!.placement === 'top'
+                ? 'top-full border-t-white dark:border-t-gray-900'
+                : 'bottom-full border-b-white dark:border-b-gray-900'
+            }`}
+          />
+        </div>
+      </>,
+      document.body,
+    )
+    : null;
+
   return (
     <div className={`relative flex flex-wrap items-center justify-center ${containerClasses} ${className}`}>
-      {activeToken !== null && (
-        <div className="fixed inset-0 z-40" onClick={() => setActiveToken(null)} />
-      )}
+      {popupLayer}
       
       {tokens.map((token, idx) => {
         const isLast = idx === tokens.length - 1;
@@ -97,22 +263,32 @@ export default function SegmentedSentence({
           && Boolean(nextToken && (nextToken.wordData || nextToken.isHanziFallback));
 
         return (
-          <span key={idx} className="relative flex items-center">
+          <span
+            key={idx}
+            ref={(node) => {
+              tokenRefs.current[idx] = node;
+            }}
+            className="relative flex items-center"
+          >
             {isInteractiveToken ? (
               <span
                 role="button"
                 tabIndex={0}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveToken(activeToken === idx ? null : idx);
+                  togglePopup(idx);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setActiveToken(activeToken === idx ? null : idx);
+                    togglePopup(idx);
                   }
                 }}
-                className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${activeToken === idx ? 'text-blue-600 dark:text-blue-400 font-bold' : ''} border-b-2 border-dashed border-blue-200 dark:border-blue-800 pb-0.5`}
+                className={`cursor-pointer rounded-lg px-0.5 pb-0.5 transition-all duration-200 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-300 ${
+                  activeToken === idx
+                    ? 'bg-blue-500/10 text-blue-600 shadow-[0_0_0_1px_rgba(59,130,246,0.18)] dark:bg-blue-400/10 dark:text-blue-300'
+                    : ''
+                } border-b-2 border-dotted border-blue-300/80 dark:border-blue-500/50`}
                 style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}
               >
                 {token.text}
@@ -125,50 +301,10 @@ export default function SegmentedSentence({
               <span className="mx-1.5 text-gray-300 dark:text-gray-700 text-sm font-light">/</span>
             )}
 
-            {activeToken === idx && isInteractiveToken && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 bg-gray-800 dark:bg-gray-950 text-white p-4 rounded-2xl shadow-2xl z-50 text-center text-sm transform transition-all animate-in fade-in zoom-in duration-200">
-                <button onClick={(e) => { e.stopPropagation(); setActiveToken(null); }} className="absolute top-2 right-2 text-gray-400 hover:text-white">
-                  <X size={16} />
-                </button>
-                <div className="text-2xl font-bold mb-1" style={{ fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}>{token.wordData?.word ?? token.text}</div>
-                {token.wordData ? (
-                  <>
-                    <div className="text-blue-300 dark:text-blue-400 font-medium text-base mb-2">{token.wordData.pinyin.toLowerCase()}</div>
-                    <div className="mb-3 text-gray-100 dark:text-gray-200">{token.wordData.meaning}</div>
-                  </>
-                ) : (
-                  <div className="mb-3 text-gray-300 dark:text-gray-400">Tap to hear this character.</div>
-                )}
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={(e) => playAudio(token.wordData?.word ?? token.text, e)}
-                    className="flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full p-2.5 transition-colors"
-                  >
-                    <Volume2 size={18} />
-                  </button>
-                  {token.wordData && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(token.wordData!.id);
-                      }}
-                      className={`flex items-center justify-center rounded-full p-2.5 transition-colors ${
-                        userWords[token.wordData.id]?.isFavorite 
-                          ? 'bg-yellow-400/30 text-yellow-400 hover:bg-yellow-400/40' 
-                          : 'bg-white/20 text-white hover:bg-white/30'
-                      }`}
-                    >
-                      <Star size={18} fill={userWords[token.wordData.id]?.isFavorite ? 'currentColor' : 'none'} />
-                    </button>
-                  )}
-                </div>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-800 dark:border-t-gray-950"></div>
-              </div>
-            )}
           </span>
         );
       })}
-      
+
       {!hidePlayButton && (
         <span 
           role="button"

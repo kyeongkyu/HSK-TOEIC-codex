@@ -308,7 +308,7 @@ export default function Home() {
     }
 
     const meta = getResumeTaskMeta(taskKey);
-    if (!meta) {
+    if (!meta || (meta.appMode === 'hsk' && meta.levelScope !== selectedLevel)) {
       onFreshStart();
       return;
     }
@@ -822,9 +822,10 @@ export default function Home() {
   return (
     <div className="px-5 py-4 min-h-[calc(100vh-160px)] bg-gray-50/80 dark:bg-gray-900 transition-colors duration-200 overflow-x-hidden">
       {/* Top Bar: Level Selector & Stats */}
-      <div className="relative flex items-center justify-between gap-4 mb-6 rounded-[1.5rem] bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-4 shadow-sm dark:shadow-none">
-        <div className="relative">
+      <div className="relative z-[60] flex items-center justify-between gap-4 mb-6 rounded-[1.5rem] border border-gray-200/60 bg-white/60 p-4 shadow-lg shadow-black/5 backdrop-blur-sm dark:border-gray-700/60 dark:bg-gray-800/60 dark:shadow-black/20">
+        <div className="relative z-[70]">
           <button 
+            type="button"
             onClick={() => setIsLevelMenuOpen(!isLevelMenuOpen)}
             className="flex items-center gap-2 text-2xl font-black tracking-tighter text-gray-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors active:scale-[0.98] transform-gpu"
           >
@@ -833,34 +834,37 @@ export default function Home() {
           </button>
           
           {isLevelMenuOpen && (
-            <div className="absolute top-full left-0 mt-3 w-40 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-xl shadow-black/10 dark:shadow-black/30 rounded-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute top-full left-0 mt-3 w-40 overflow-hidden rounded-3xl border border-gray-200 bg-white py-1.5 shadow-2xl shadow-black/20 animate-in fade-in slide-in-from-top-2 duration-200 dark:border-gray-700 dark:bg-gray-950 dark:shadow-black/30 z-[80] pointer-events-auto">
               {[1, 2, 3, 4, 5, 6].map(level => (
                 <button
+                  type="button"
                   key={level}
                   onClick={() => {
                     setLevel(level);
                     setIsLevelMenuOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${selectedLevel === level ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-200'}`}
+                  className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors hover:bg-white/60 dark:hover:bg-white/10 ${selectedLevel === level ? 'bg-blue-50/60 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'}`}
                 >
                   HSK {level}
                 </button>
               ))}
               <button
+                type="button"
                 onClick={() => {
                   setLevel('all');
                   setIsLevelMenuOpen(false);
                 }}
-                className={`w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700 ${selectedLevel === 'all' ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-200'}`}
+                className={`w-full border-t border-gray-200/60 px-4 py-2.5 text-left text-sm font-bold transition-colors hover:bg-white/60 dark:border-white/10 dark:hover:bg-white/10 ${selectedLevel === 'all' ? 'bg-blue-50/60 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'}`}
               >
                 HSK 1~6
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setAppMode('entry');
                   setIsLevelMenuOpen(false);
                 }}
-                className="w-full text-left px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700"
+                className="w-full border-t border-gray-200/60 px-4 py-2.5 text-left text-sm font-bold text-gray-700 transition-colors hover:bg-white/60 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
               >
                 Main
               </button>

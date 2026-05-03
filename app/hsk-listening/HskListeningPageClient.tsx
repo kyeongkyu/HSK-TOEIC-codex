@@ -367,7 +367,7 @@ export default function HskListeningPage() {
       revealStep,
       sessionResults,
       sessionPlayCounts,
-    } satisfies HskListeningResumeSnapshot);
+    } satisfies HskListeningResumeSnapshot, { taskKey: 'hsk-listening', levelScope: selectedLevel });
   }, [currentIndex, currentQuestion, questions, revealStep, reviewFilter, selectedAnswer, selectedLevel, selectedMode, selectedTopic, sessionPlayCounts, sessionResults, step, submitted]);
 
   const goBack = () => {

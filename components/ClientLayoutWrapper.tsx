@@ -30,6 +30,29 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   }, [pathname]);
 
   React.useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    if (typeof window === 'undefined') return;
+
+    const clearDevelopmentCaches = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(registration => registration.unregister()));
+        }
+
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+        }
+      } catch (error) {
+        console.warn('Failed to clear development service worker caches', error);
+      }
+    };
+
+    void clearDevelopmentCaches();
+  }, []);
+
+  React.useEffect(() => {
     const routes = appMode === 'hsk'
       ? HSK_PREFETCH_ROUTES
       : appMode === 'toeic'
@@ -39,7 +62,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
 
     const prefetchRoutes = () => {
       routes.forEach(route => router.prefetch(route));
-      navigator.serviceWorker?.controller?.postMessage({ type: 'WARM_OFFLINE_ROUTES' });
+      if (process.env.NODE_ENV === 'production') {
+        navigator.serviceWorker?.controller?.postMessage({ type: 'WARM_OFFLINE_ROUTES' });
+      }
     };
 
     if ('requestIdleCallback' in window) {

@@ -140,6 +140,8 @@ function StudyContent() {
     enabled: settingsLoaded && wordsLoaded && resumeRestored,
     active: !categories || Boolean(selectedTopicId),
     hasContent: filteredWords.length > 0,
+    taskKey: 'hsk-browse',
+    levelScope: selectedLevel,
   });
 
   useEffect(() => {

@@ -11,6 +11,10 @@ interface SettingsContextType {
   toggleCarouselView: () => void;
   ttsSpeed: number;
   setTtsSpeed: (speed: number) => void;
+  hskTtsSpeed: number;
+  toeicTtsSpeed: number;
+  setHskTtsSpeed: (speed: number) => void;
+  setToeicTtsSpeed: (speed: number) => void;
   hanziWriterMode: boolean;
   toggleHanziWriterMode: () => void;
   separateLibraryByLevel: boolean;
@@ -34,7 +38,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [separateLibraryByLevel, setSeparateLibraryByLevel] = useState(false);
   const [hanziFont, setHanziFontState] = useState('Noto Serif SC');
   const [hanziSize, setHanziSizeState] = useState(3);
-  const [ttsSpeed, setTtsSpeedState] = useState(3); // Default level 3 (1.0x)
+  const [hskTtsSpeed, setHskTtsSpeedState] = useState(3);
+  const [toeicTtsSpeed, setToeicTtsSpeedState] = useState(3);
   const [isLoaded, setIsLoaded] = useState(false);
   const [appMode, setAppModeState] = useState<'hsk' | 'toeic' | 'entry' | null>(null);
 
@@ -80,9 +85,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setHanziSizeState(parseInt(storedHanziSize, 10));
     }
     
-    const storedTtsSpeed = localStorage.getItem('hsk_tts_speed');
-    if (storedTtsSpeed) {
-      setTtsSpeedState(parseInt(storedTtsSpeed, 10));
+    const storedHskTtsSpeed = localStorage.getItem('hsk_tts_speed');
+    if (storedHskTtsSpeed) {
+      setHskTtsSpeedState(parseInt(storedHskTtsSpeed, 10));
+    }
+
+    const storedToeicTtsSpeed = localStorage.getItem('toeic_tts_speed');
+    if (storedToeicTtsSpeed) {
+      setToeicTtsSpeedState(parseInt(storedToeicTtsSpeed, 10));
     }
     
     if (initialTheme !== 'light') {
@@ -114,8 +124,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setTtsSpeed = (speed: number) => {
-    setTtsSpeedState(speed);
+    if (appMode === 'toeic') {
+      setToeicTtsSpeed(speed);
+    } else {
+      setHskTtsSpeed(speed);
+    }
+  };
+
+  const setHskTtsSpeed = (speed: number) => {
+    setHskTtsSpeedState(speed);
     localStorage.setItem('hsk_tts_speed', String(speed));
+  };
+
+  const setToeicTtsSpeed = (speed: number) => {
+    setToeicTtsSpeedState(speed);
+    localStorage.setItem('toeic_tts_speed', String(speed));
   };
 
   const setHanziFont = (font: string) => {
@@ -176,8 +199,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setThemeMode,
       isCarouselView,
       toggleCarouselView,
-      ttsSpeed, 
+      ttsSpeed: appMode === 'toeic' ? toeicTtsSpeed : hskTtsSpeed, 
       setTtsSpeed, 
+      hskTtsSpeed,
+      toeicTtsSpeed,
+      setHskTtsSpeed,
+      setToeicTtsSpeed,
       hanziWriterMode, 
       toggleHanziWriterMode, 
       separateLibraryByLevel,

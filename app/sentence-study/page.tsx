@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Eye, EyeOff, List, Volume2 } from 'lucide-react';
+import { ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Eye, EyeOff, List, Star, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   HSK_SENTENCE_STUDY_TOPICS,
@@ -11,7 +11,9 @@ import {
   HskSentenceStudyItem,
   HskSentenceStudyTopic,
 } from '@/data/hsk-sentence-study';
+import { hskWords } from '@/data/hsk';
 import { useSettings } from '@/hooks/use-settings';
+import { useUserWords } from '@/hooks/use-user-words';
 import { speak } from '@/lib/tts';
 
 const BOOKMARK_STORAGE_KEY = 'hsk_sentence_study_bookmarks';
@@ -51,11 +53,13 @@ function getSentenceTextSizeClass(text: string) {
 export default function SentenceStudyPage() {
   const router = useRouter();
   const { selectedLevel, ttsSpeed, hanziFont, isLoaded } = useSettings();
+  const { userWords, toggleFavorite } = useUserWords();
   const [selectedTopic, setSelectedTopic] = useState<HskSentenceStudyTopic | 'all'>('all');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isListOpen, setIsListOpen] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [revealed, setRevealed] = useState<RevealState>(INITIAL_REVEAL_STATE);
+  const [activeKeywordKey, setActiveKeywordKey] = useState<string | null>(null);
 
   const activeLevel = getLevelForSentenceStudy(selectedLevel);
 
@@ -78,6 +82,12 @@ export default function SentenceStudyPage() {
 
   const currentSentence = filteredSentences[currentIndex];
   const isBookmarked = currentSentence ? bookmarkedIds.includes(currentSentence.id) : false;
+
+  const getKeywordWord = (keyword: HskSentenceStudyItem['keywords'][number]) => {
+    return keyword.wordId
+      ? hskWords.find((word) => word.id === keyword.wordId)
+      : hskWords.find((word) => word.word === keyword.word);
+  };
 
   useEffect(() => {
     try {
@@ -116,6 +126,7 @@ export default function SentenceStudyPage() {
     setCurrentIndex(index);
     setRevealed(INITIAL_REVEAL_STATE);
     setIsListOpen(false);
+    setActiveKeywordKey(null);
   };
 
   const moveBy = (amount: number) => {
@@ -270,7 +281,7 @@ export default function SentenceStudyPage() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="overflow-hidden rounded-[2rem] border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-6 shadow-sm"
+          className="overflow-visible rounded-[2rem] border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-6 shadow-sm"
         >
           <div className="mb-6 text-center">
             <p className="mb-3 text-[10px] font-black uppercase tracking-[0.24em] text-gray-400">
@@ -308,14 +319,60 @@ export default function SentenceStudyPage() {
             </p>
             <div className="flex flex-wrap gap-2">
               {currentSentence.keywords.map((keyword) => (
-                <span
-                  key={`${currentSentence.id}-${keyword.word}`}
-                  className="rounded-xl bg-white dark:bg-gray-900 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700"
-                >
-                  <span className="text-blue-600 dark:text-blue-400">{keyword.word}</span>
-                  <span className="ml-1 text-gray-400">·</span>
-                  <span className="ml-1">{keyword.meaningKo}</span>
-                </span>
+                (() => {
+                  const wordData = getKeywordWord(keyword);
+                  const keywordKey = `${currentSentence.id}-${keyword.word}`;
+                  const isActive = activeKeywordKey === keywordKey;
+                  return (
+                    <div key={keywordKey} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveKeywordKey(isActive ? null : keywordKey)}
+                        className="rounded-xl bg-white dark:bg-gray-900 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700 active:scale-95 transition-all"
+                      >
+                        <span className="text-blue-600 dark:text-blue-400">{keyword.word}</span>
+                        <span className="ml-1 text-gray-400">?</span>
+                        <span className="ml-1">{wordData?.meaning ?? keyword.meaningKo}</span>
+                      </button>
+
+                      {isActive && (
+                        <div className="absolute left-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-3rem)] rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-2xl shadow-black/10 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/40">
+                          <div className="text-lg font-black text-black dark:text-white">{keyword.word}</div>
+                          {wordData?.pinyin && (
+                            <div className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-400">{wordData.pinyin.toLowerCase()}</div>
+                          )}
+                          <div className="mt-2 text-sm font-semibold leading-relaxed text-gray-500 dark:text-gray-300">
+                            {wordData?.meaning ?? keyword.meaningKo}
+                          </div>
+                          <div className="mt-4 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => speak(keyword.word, ttsSpeed, 'zh-CN')}
+                              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white active:scale-95 transition-all"
+                            >
+                              <Volume2 size={15} />
+                              TTS
+                            </button>
+                            {wordData && (
+                              <button
+                                type="button"
+                                onClick={() => toggleFavorite(wordData.id)}
+                                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black active:scale-95 transition-all ${
+                                  userWords[wordData.id]?.isFavorite
+                                    ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-500/15 dark:text-yellow-300'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                                }`}
+                              >
+                                <Star size={15} fill={userWords[wordData.id]?.isFavorite ? 'currentColor' : 'none'} />
+                                Library
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ))}
             </div>
             {currentSentence.notes && (

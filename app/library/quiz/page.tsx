@@ -35,6 +35,7 @@ type LibraryQuizSnapshot = {
   selectedOption: string | null;
   userTokens: string[];
   shuffledTokens: string[];
+  wasRevealedAnswer?: boolean;
 };
 type LibraryQuizResumeSnapshot = {
   questions: LibraryQuizQuestion[];
@@ -45,6 +46,7 @@ type LibraryQuizResumeSnapshot = {
   shuffledTokens: string[];
   questionSnapshots: Array<LibraryQuizSnapshot | null>;
   score: number;
+  wasRevealedAnswer?: boolean;
 };
 
 function shuffleArray<T>(items: T[]) {
@@ -90,6 +92,7 @@ export default function LibraryQuizPage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [userTokens, setUserTokens] = useState<string[]>([]);
   const [shuffledTokens, setShuffledTokens] = useState<string[]>([]);
+  const [wasRevealedAnswer, setWasRevealedAnswer] = useState(false);
   const [score, setScore] = useState(0);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [savedIndex, setSavedIndex] = useState<number | null>(null);
@@ -206,6 +209,7 @@ export default function LibraryQuizPage() {
       setShuffledTokens(snapshot.shuffledTokens);
       setQuestionSnapshots(snapshot.questionSnapshots);
       setScore(snapshot.score);
+      setWasRevealedAnswer(Boolean(snapshot.wasRevealedAnswer));
       setShowResumeModal(false);
       resumeHydratedRef.current = true;
     }, 0);
@@ -233,8 +237,9 @@ export default function LibraryQuizPage() {
       shuffledTokens,
       questionSnapshots,
       score,
-    } satisfies LibraryQuizResumeSnapshot);
-  }, [currentIndex, questionSnapshots, questions, quizState, resumeRoute, score, selectedOption, shuffledTokens, userTokens]);
+      wasRevealedAnswer,
+    } satisfies LibraryQuizResumeSnapshot, { taskKey: 'hsk-library-quiz', levelScope: selectedLevel });
+  }, [currentIndex, questionSnapshots, questions, quizState, resumeRoute, score, selectedLevel, selectedOption, shuffledTokens, userTokens, wasRevealedAnswer]);
 
   const isCorrect = useMemo(() => {
     if (!currentQuestion) return false;
@@ -254,6 +259,7 @@ export default function LibraryQuizPage() {
       selectedOption,
       userTokens,
       shuffledTokens,
+      wasRevealedAnswer,
     };
     setQuestionSnapshots(prev => {
       const next = [...prev];
@@ -271,6 +277,7 @@ export default function LibraryQuizPage() {
       setSelectedOption(currentSnapshot.selectedOption);
       setUserTokens(currentSnapshot.userTokens);
       setShuffledTokens(currentSnapshot.shuffledTokens);
+      setWasRevealedAnswer(Boolean(currentSnapshot.wasRevealedAnswer));
       return;
     }
 
@@ -278,6 +285,7 @@ export default function LibraryQuizPage() {
     setSelectedOption(null);
     setUserTokens([]);
     setShuffledTokens(currentQuestion.shuffledTokens ? [...currentQuestion.shuffledTokens] : []);
+    setWasRevealedAnswer(false);
   }, [currentIndex, currentQuestion, currentSnapshot, quizState]);
 
   // Auto-play TTS
@@ -350,6 +358,7 @@ export default function LibraryQuizPage() {
     answerShuffledTokens = shuffledTokens,
   ) => {
     setQuizState('feedback');
+    setWasRevealedAnswer(false);
     if (isAnsCorrect) {
       if (questionSnapshots[currentIndex]?.quizState !== 'feedback') {
         setScore(s => s + 1);
@@ -368,9 +377,44 @@ export default function LibraryQuizPage() {
         selectedOption: answerValue,
         userTokens: answerTokens,
         shuffledTokens: answerShuffledTokens,
+        wasRevealedAnswer: false,
       };
       return next;
     });
+  };
+
+  const handleRevealAnswer = () => {
+    if (!currentQuestion || quizState !== 'answering') return;
+    const answerValue = currentQuestion.format === 'sentence-fill'
+      ? currentQuestion.word.word
+      : currentQuestion.format === 'hanzi-to-meaning' || currentQuestion.format === 'meaning-to-hanzi'
+        ? currentQuestion.word.id
+        : null;
+    const answerTokens = currentQuestion.correctTokens ? [...currentQuestion.correctTokens] : userTokens;
+
+    setQuizState('feedback');
+    setSelectedOption(answerValue);
+    setUserTokens(answerTokens);
+    setShuffledTokens([]);
+    setWasRevealedAnswer(true);
+
+    setQuestionSnapshots(prev => {
+      const next = [...prev];
+      next[currentIndex] = {
+        quizState: 'feedback',
+        selectedOption: answerValue,
+        userTokens: answerTokens,
+        shuffledTokens: [],
+        wasRevealedAnswer: true,
+      };
+      return next;
+    });
+
+    if (currentQuestion.format === 'hanzi-to-meaning' || currentQuestion.format === 'meaning-to-hanzi') {
+      speak(currentQuestion.word.word, ttsSpeed);
+    } else if (currentQuestion.sentence) {
+      speak(currentQuestion.sentence.chinese, ttsSpeed);
+    }
   };
 
   const handleNext = () => {
@@ -397,6 +441,7 @@ export default function LibraryQuizPage() {
     setSelectedOption(null);
     setUserTokens([]);
     setShuffledTokens([]);
+    setWasRevealedAnswer(false);
     setQuestionSnapshots([]);
     setScore(0);
     localStorage.removeItem('library-quiz-progress');
@@ -916,7 +961,11 @@ export default function LibraryQuizPage() {
               exit={{ opacity: 0, y: 20 }}
               className="w-full max-w-2xl flex flex-col items-center"
             >
-              <QuizFeedbackPanel isCorrect={isCorrect} className="mb-4 w-full">
+              <QuizFeedbackPanel
+                isCorrect={isCorrect && !wasRevealedAnswer}
+                reviewLabel={wasRevealedAnswer ? 'Answer Revealed' : 'Review Answer'}
+                className="mb-4 w-full"
+              >
                 <div className="rounded-3xl bg-white p-5 text-center shadow-sm dark:bg-gray-900/70">
                   <div className="flex justify-center">
                     <SegmentedSentence
@@ -972,7 +1021,7 @@ export default function LibraryQuizPage() {
                 </button>
               )}
               <button 
-                onClick={() => setQuizState('feedback')}
+                onClick={handleRevealAnswer}
                 className="flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-3 px-4 rounded-xl font-bold active:scale-95 transition-all border border-blue-100 dark:border-blue-800/30"
               >
                 <Eye size={16} />
