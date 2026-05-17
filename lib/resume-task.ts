@@ -10,13 +10,16 @@ export type ResumeTaskKey =
   | 'hsk-listening'
   | 'hsk-grammar'
   | 'hsk-library-quiz'
+  | 'jlpt-vocab'
+  | 'jlpt-kana-hiragana'
+  | 'jlpt-kana-katakana'
   | 'toeic-vocab'
   | 'toeic-part2'
   | 'toeic-part5';
 
 export type ResumeTaskMeta = {
   taskKey: ResumeTaskKey;
-  appMode: 'hsk' | 'toeic';
+  appMode: 'hsk' | 'toeic' | 'jlpt';
   label: string;
   route: string;
   updatedAt: number;
@@ -39,6 +42,9 @@ const RESUME_TASK_DEFINITIONS: ResumeTaskDefinition[] = [
   { taskKey: 'hsk-listening', appMode: 'hsk', label: 'Listening', route: '/hsk-listening', matchesRoute: route => route === '/hsk-listening' },
   { taskKey: 'hsk-grammar', appMode: 'hsk', label: 'Grammar', route: '/grammar', matchesRoute: route => route === '/grammar' },
   { taskKey: 'hsk-library-quiz', appMode: 'hsk', label: 'Library Quiz', route: '/library/quiz', matchesRoute: route => route === '/library/quiz' },
+  { taskKey: 'jlpt-vocab', appMode: 'jlpt', label: 'JLPT N5 Vocabulary', route: '/jlpt/vocab', matchesRoute: route => route === '/jlpt/vocab' },
+  { taskKey: 'jlpt-kana-hiragana', appMode: 'jlpt', label: 'Hiragana', route: '/jlpt/kana?script=hiragana', matchesRoute: route => route === '/jlpt/kana?script=hiragana' },
+  { taskKey: 'jlpt-kana-katakana', appMode: 'jlpt', label: 'Katakana', route: '/jlpt/kana?script=katakana', matchesRoute: route => route === '/jlpt/kana?script=katakana' },
   { taskKey: 'toeic-vocab', appMode: 'toeic', label: 'TOEIC Vocabulary', route: '/', matchesRoute: route => route === '/' },
   { taskKey: 'toeic-part2', appMode: 'toeic', label: 'TOEIC Part 2', route: '/toeic-part2', matchesRoute: route => route === '/toeic-part2' },
   { taskKey: 'toeic-part5', appMode: 'toeic', label: 'TOEIC Part 5', route: '/toeic-part5', matchesRoute: route => route === '/toeic-part5' },
@@ -60,7 +66,9 @@ function getBaseRoute(route: string) {
 
 function inferTaskKey(route: string): ResumeTaskKey | null {
   const baseRoute = getBaseRoute(route);
-  return RESUME_TASK_DEFINITIONS.find(definition => definition.matchesRoute(baseRoute))?.taskKey ?? null;
+  return RESUME_TASK_DEFINITIONS.find(definition => definition.matchesRoute(route))?.taskKey
+    ?? RESUME_TASK_DEFINITIONS.find(definition => definition.matchesRoute(baseRoute))?.taskKey
+    ?? null;
 }
 
 function readJsonRecord<T>(key: string): Record<string, T> {
@@ -68,7 +76,6 @@ function readJsonRecord<T>(key: string): Record<string, T> {
 }
 
 function inferTaskMeta(route: string, label: string): ResumeTaskMeta | null {
-  const baseRoute = getBaseRoute(route);
   const taskKey = inferTaskKey(route);
   const definition = taskKey ? ResumeTaskRegistry[taskKey] : null;
 
@@ -108,7 +115,7 @@ export function setResumeTaskSnapshot(route: string, label: string, snapshot: un
   const meta = inferred
     ? { ...inferred, taskKey: taskKey ?? inferred.taskKey }
     : taskKey
-      ? { taskKey, appMode: explicitDefinition?.appMode ?? (taskKey.startsWith('toeic') ? 'toeic' : 'hsk'), label, route, updatedAt: Date.now() } satisfies ResumeTaskMeta
+      ? { taskKey, appMode: explicitDefinition?.appMode ?? (taskKey.startsWith('toeic') ? 'toeic' : taskKey.startsWith('jlpt') ? 'jlpt' : 'hsk'), label, route, updatedAt: Date.now() } satisfies ResumeTaskMeta
       : null;
 
   if (meta) {

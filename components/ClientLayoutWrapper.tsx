@@ -7,6 +7,7 @@ import { useNavigationLatencyReporter } from '@/lib/navigation-performance';
 
 const HSK_PREFETCH_ROUTES = ['/', '/study', '/hsk-listening', '/sentence-study', '/library', '/settings', '/quiz', '/memorize', '/grammar'] as const;
 const TOEIC_PREFETCH_ROUTES = ['/', '/library', '/settings', '/toeic-part2', '/toeic-part5'] as const;
+const JLPT_PREFETCH_ROUTES = ['/', '/jlpt/vocab', '/jlpt/kana?script=hiragana', '/jlpt/kana?script=katakana', '/library', '/settings'] as const;
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -57,7 +58,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
       ? HSK_PREFETCH_ROUTES
       : appMode === 'toeic'
         ? TOEIC_PREFETCH_ROUTES
-        : [];
+        : appMode === 'jlpt'
+          ? JLPT_PREFETCH_ROUTES
+          : [];
     if (routes.length === 0) return;
 
     const prefetchRoutes = () => {
@@ -77,7 +80,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   }, [appMode, router]);
 
   const isHomeScreen = pathname === '/' && (appMode !== 'toeic' || rootView === 'home');
-  const showNav = (appMode === 'hsk' || appMode === 'toeic') && (isHomeScreen || pathname === '/settings' || pathname === '/library');
+  const showNav = (appMode === 'hsk' || appMode === 'toeic' || appMode === 'jlpt') && (isHomeScreen || pathname === '/settings' || pathname === '/library');
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col overflow-x-hidden">

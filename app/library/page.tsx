@@ -5,7 +5,8 @@ import { Star, BookOpen, Brain, CheckSquare } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { speak } from '@/lib/tts';
 import { useSettings } from '@/hooks/use-settings';
-import type { WordData } from '@/lib/srs';
+import type { LibraryWord } from '@/features/jlpt/library';
+import { normalizeJlptKanaForLibrary, normalizeJlptVocabForLibrary } from '@/features/jlpt/library';
 
 export default function LibraryPage() {
   const { userWords, toggleFavorite, isLoaded } = useUserWords();
@@ -13,7 +14,7 @@ export default function LibraryPage() {
   const [isMemorizeMode, setIsMemorizeMode] = useState(false);
   const [revealedWords, setRevealedWords] = useState<Record<string, boolean>>({});
   const [speakingWordId, setSpeakingWordId] = useState<string | null>(null);
-  const [wordData, setWordData] = useState<WordData[]>([]);
+  const [wordData, setWordData] = useState<LibraryWord[]>([]);
   const [isWordDataLoaded, setIsWordDataLoaded] = useState(false);
 
   useEffect(() => {
@@ -21,9 +22,23 @@ export default function LibraryPage() {
     setIsWordDataLoaded(false);
 
     const loadWords = async () => {
-      const words = appMode === 'toeic'
-        ? (await import('@/data/toeic')).toeicWords
-        : (await import('@/data/hsk')).hskWords;
+      let words: LibraryWord[];
+
+      if (appMode === 'toeic') {
+        words = (await import('@/data/toeic')).toeicWords.map(word => ({ ...word, source: 'toeic', displayStyle: 'latin' }));
+      } else if (appMode === 'jlpt') {
+        const [{ jlptN5Vocab }, { jlptHiragana, jlptKatakana }] = await Promise.all([
+          import('@/data/jlpt/vocab-n5'),
+          import('@/data/jlpt/kana'),
+        ]);
+        words = [
+          ...jlptN5Vocab.map(normalizeJlptVocabForLibrary),
+          ...jlptHiragana.map(normalizeJlptKanaForLibrary),
+          ...jlptKatakana.map(normalizeJlptKanaForLibrary),
+        ];
+      } else {
+        words = (await import('@/data/hsk')).hskWords.map(word => ({ ...word, source: 'hsk', displayStyle: 'hanzi' }));
+      }
 
       if (!isCancelled) {
         setWordData(words);
@@ -42,9 +57,9 @@ export default function LibraryPage() {
     setRevealedWords(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleSpeakWord = (word: { id: string; word: string }) => {
+  const handleSpeakWord = (word: LibraryWord) => {
     setSpeakingWordId(word.id);
-    speak(word.word, ttsSpeed, appMode === 'toeic' ? 'en-US' : 'zh-CN', () => {
+    speak(word.speakText ?? word.word, ttsSpeed, appMode === 'toeic' ? 'en-US' : appMode === 'jlpt' ? 'ja-JP' : 'zh-CN', () => {
       setSpeakingWordId(current => current === word.id ? null : current);
     });
   };
@@ -53,7 +68,7 @@ export default function LibraryPage() {
     const favoriteWordIds = new Set(Object.keys(userWords).filter(id => userWords[id]?.isFavorite));
     let filtered = wordData.filter(w => favoriteWordIds.has(w.id));
     
-    if (appMode !== 'toeic' && separateLibraryByLevel && selectedLevel !== 'all') {
+    if (appMode === 'hsk' && separateLibraryByLevel && selectedLevel !== 'all') {
       filtered = filtered.filter(w => w.level === selectedLevel);
     }
     
@@ -88,13 +103,15 @@ export default function LibraryPage() {
               <Brain size={18} />
               <span>{isMemorizeMode ? 'Reviewing' : 'Memorize'}</span>
             </button>
-            <Link
-              href="/library/quiz"
-              className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold transition-all active:scale-95 bg-black dark:bg-blue-500 text-white shadow-lg transform-gpu"
-            >
-              <CheckSquare size={18} />
-              <span>Quiz</span>
-            </Link>
+            {appMode !== 'jlpt' && (
+              <Link
+                href="/library/quiz"
+                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold transition-all active:scale-95 bg-black dark:bg-blue-500 text-white shadow-lg transform-gpu"
+              >
+                <CheckSquare size={18} />
+                <span>Quiz</span>
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -106,10 +123,10 @@ export default function LibraryPage() {
           </div>
           <h3 className="text-xl font-bold text-black dark:text-white mb-2">No favorites yet</h3>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 max-w-[200px]">
-            Curate your collection by starring words in Browse mode.
+            Curate your collection by starring words in learning mode.
           </p>
           <Link 
-            href={appMode === 'toeic' ? "/" : "/study"} 
+            href={appMode === 'hsk' ? "/study" : "/"} 
             className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold active:scale-95 transition-all shadow-lg shadow-blue-600/20 transform-gpu"
           >
             <BookOpen size={18} />
@@ -135,13 +152,13 @@ export default function LibraryPage() {
                     <button
                       type="button"
                       onClick={() => handleSpeakWord(word)}
-                      className={`${appMode === 'toeic' ? 'text-xl' : 'text-3xl'} font-bold truncate text-left transition-colors active:scale-[0.98] transform-gpu ${speakingWordId === word.id ? 'text-blue-600 dark:text-blue-400' : 'text-black dark:text-white'}`}
-                      style={appMode === 'toeic' ? undefined : { fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` }}
+                      className={`${word.displayStyle === 'hanzi' || word.displayStyle === 'kana' ? 'text-3xl' : 'text-xl'} font-bold truncate text-left transition-colors active:scale-[0.98] transform-gpu ${speakingWordId === word.id ? 'text-blue-600 dark:text-blue-400' : 'text-black dark:text-white'}`}
+                      style={word.displayStyle === 'hanzi' ? { fontFamily: `var(--font-${hanziFont.toLowerCase().replace(/ /g, '-')})` } : undefined}
                       aria-label={`Listen to ${word.word}`}
                     >
                       {word.word}
                     </button>
-                    {appMode === 'toeic' && (
+                    {(appMode === 'toeic' || appMode === 'jlpt') && (
                       <span className="shrink-0 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-[10px] font-black text-blue-600 dark:text-blue-300 uppercase">
                         {word.pinyin}
                       </span>
@@ -164,7 +181,7 @@ export default function LibraryPage() {
                   </div>
                 ) : (
                   <>
-                    {appMode !== 'toeic' && (
+                    {appMode === 'hsk' && (
                       <span className="text-sm font-bold text-blue-600 dark:text-blue-400 italic mb-1">{word.pinyin.toLowerCase()}</span>
                     )}
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-300 leading-snug">{word.meaning}</span>

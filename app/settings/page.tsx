@@ -12,7 +12,8 @@ const HSK_WORD_ID_PATTERN = /^\d+$/;
 
 function isUserWordInScope(id: string, scope: ResetScope) {
   const isHskWord = HSK_WORD_ID_PATTERN.test(id);
-  return scope === 'hsk' ? isHskWord : !isHskWord;
+  const isJlptWord = id.startsWith('jlpt-') || id.startsWith('hiragana-') || id.startsWith('katakana-');
+  return scope === 'hsk' ? isHskWord : !isHskWord && !isJlptWord;
 }
 
 export default function SettingsPage() {
@@ -25,6 +26,8 @@ export default function SettingsPage() {
     setTtsSpeed, 
     hanziWriterMode, 
     toggleHanziWriterMode, 
+    jlptKanaWriterMode,
+    toggleJlptKanaWriterMode,
     separateLibraryByLevel,
     toggleSeparateLibraryByLevel,
     hanziFont,
@@ -270,23 +273,43 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Display</h2>
           <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-black dark:text-white mb-1">Carousel View</span>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Show home modes as swipeable cards</span>
+            {appMode !== 'jlpt' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-lg font-bold text-black dark:text-white mb-1">Carousel View</span>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Show home modes as swipeable cards</span>
+                  </div>
+                  <button 
+                    onClick={toggleCarouselView}
+                    className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${isCarouselView ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                  >
+                    <span
+                      className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${isCarouselView ? 'translate-x-6' : 'translate-x-0'}`}
+                    />
+                  </button>
+                </div>
+                
+                <div className="w-full h-px bg-gray-200 dark:bg-gray-700" />
+              </>
+            )}
+            
+            {appMode === 'jlpt' ? (
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-black dark:text-white mb-1">Kana Writer Mode</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Show a grid guide for Japanese kana cards</span>
+                </div>
+                <button
+                  onClick={toggleJlptKanaWriterMode}
+                  className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${jlptKanaWriterMode ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                >
+                  <span
+                    className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${jlptKanaWriterMode ? 'translate-x-6' : 'translate-x-0'}`}
+                  />
+                </button>
               </div>
-              <button 
-                onClick={toggleCarouselView}
-                className={`relative inline-flex h-8 w-14 shrink-0 overflow-hidden rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 active:scale-95 transform-gpu ${isCarouselView ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
-              >
-                <span
-                  className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${isCarouselView ? 'translate-x-6' : 'translate-x-0'}`}
-                />
-              </button>
-            </div>
-            
-            <div className="w-full h-px bg-gray-200 dark:bg-gray-700" />
-            
+            ) : (
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-lg font-bold text-black dark:text-white mb-1">Hanzi Writer Mode</span>
@@ -301,9 +324,11 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+            )}
           </div>
         </section>
 
+        {appMode !== 'jlpt' && (
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Library</h2>
           <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
@@ -323,7 +348,9 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+        )}
 
+        {appMode !== 'jlpt' && (
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Hanzi Size</h2>
           <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-6">
@@ -353,7 +380,9 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+        )}
 
+        {appMode !== 'jlpt' && (
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4 ml-2">Hanzi Font</h2>
           <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-4">
@@ -438,8 +467,9 @@ export default function SettingsPage() {
             </p>
           </div>
         </section>
+        )}
 
-        {renderResetSection('hsk')}
+        {appMode !== 'jlpt' && renderResetSection('hsk')}
       </div>
 
       {renderResetModal()}

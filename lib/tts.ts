@@ -34,6 +34,14 @@ function getPreferredVoice(voices: SpeechSynthesisVoice[], targetLang: string) {
     }) ?? null;
   }
 
+  if (normalizedLang.includes('ja')) {
+    return voices.find((voice) => {
+      const lang = voice.lang.toLowerCase();
+      const name = voice.name.toLowerCase();
+      return lang.includes('ja-jp') || lang === 'ja' || name.includes('japanese') || name.includes('kyoko');
+    }) ?? null;
+  }
+
   if (normalizedLang.includes('en')) {
     return voices.find((voice) => {
       const lang = voice.lang.toLowerCase();
@@ -45,6 +53,53 @@ function getPreferredVoice(voices: SpeechSynthesisVoice[], targetLang: string) {
   return null;
 }
 
+function getVoicesWhenReady(synthesis: SpeechSynthesis) {
+  const voices = synthesis.getVoices();
+  if (voices.length > 0) return Promise.resolve(voices);
+
+  return new Promise<SpeechSynthesisVoice[]>((resolve) => {
+    let didResolve = false;
+
+    const finish = () => {
+      if (didResolve) return;
+      didResolve = true;
+      synthesis.removeEventListener?.('voiceschanged', finish);
+      resolve(synthesis.getVoices());
+    };
+
+    synthesis.addEventListener?.('voiceschanged', finish, { once: true });
+    window.setTimeout(finish, 350);
+  });
+}
+
+function speakWithVoices(text: string, level: number, targetLang: string, voices: SpeechSynthesisVoice[], onEnd?: () => void) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    onEnd?.();
+    return;
+  }
+
+  const synthesis = window.speechSynthesis;
+  safelyPrepareSpeech(synthesis);
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = targetLang;
+  utterance.rate = getTtsRate(level);
+  utterance.onend = () => onEnd?.();
+  utterance.onerror = () => onEnd?.();
+
+  const preferredVoice = getPreferredVoice(voices, targetLang);
+  if (preferredVoice) {
+    utterance.voice = preferredVoice;
+    utterance.lang = preferredVoice.lang;
+  }
+
+  try {
+    synthesis.speak(utterance);
+  } catch {
+    onEnd?.();
+  }
+}
+
 export const speak = (text: string, level: number = 3, targetLang: string = 'zh-CN', onEnd?: () => void) => {
   if (typeof window === 'undefined' || !window.speechSynthesis || !text.trim()) {
     onEnd?.();
@@ -52,25 +107,10 @@ export const speak = (text: string, level: number = 3, targetLang: string = 'zh-
   }
 
   const synthesis = window.speechSynthesis;
-  safelyPrepareSpeech(synthesis);
-  
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = targetLang;
-  utterance.rate = getTtsRate(level);
-  utterance.onend = () => onEnd?.();
-  utterance.onerror = () => onEnd?.();
-  
-  const preferredVoice = getPreferredVoice(synthesis.getVoices(), targetLang);
-  if (preferredVoice) {
-    utterance.voice = preferredVoice;
-    utterance.lang = preferredVoice.lang;
-  }
-  
-  try {
-    synthesis.speak(utterance);
-  } catch {
-    onEnd?.();
-  }
+
+  void getVoicesWhenReady(synthesis).then((voices) => {
+    speakWithVoices(text, level, targetLang, voices, onEnd);
+  });
 };
 
 export type TtsVoiceProfile = {

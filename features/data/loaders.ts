@@ -19,3 +19,16 @@ export async function loadToeicPart5Data() {
 export async function loadHskSentenceStudyData() {
   return import('@/data/hsk-sentence-study');
 }
+
+export async function loadJlptVocab(level: 'N5') {
+  if (level === 'N5') {
+    return (await import('@/data/jlpt/vocab-n5')).jlptN5Vocab;
+  }
+
+  return [];
+}
+
+export async function loadJlptKana(script: 'hiragana' | 'katakana') {
+  const { getJlptKana } = await import('@/data/jlpt/kana');
+  return getJlptKana(script);
+}

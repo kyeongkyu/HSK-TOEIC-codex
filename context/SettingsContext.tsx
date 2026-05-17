@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 interface SettingsContextType {
   selectedLevel: number | 'all';
   setLevel: (level: number | 'all') => void;
+  selectedJlptLevel: 'N5';
+  setJlptLevel: (level: 'N5') => void;
   isDarkMode: boolean;
   themeMode: 'light' | 'dark' | 'black';
   setThemeMode: (mode: 'light' | 'dark' | 'black') => void;
@@ -17,6 +19,8 @@ interface SettingsContextType {
   setToeicTtsSpeed: (speed: number) => void;
   hanziWriterMode: boolean;
   toggleHanziWriterMode: () => void;
+  jlptKanaWriterMode: boolean;
+  toggleJlptKanaWriterMode: () => void;
   separateLibraryByLevel: boolean;
   toggleSeparateLibraryByLevel: () => void;
   hanziFont: string;
@@ -24,34 +28,39 @@ interface SettingsContextType {
   hanziSize: number;
   setHanziSize: (size: number) => void;
   isLoaded: boolean;
-  appMode: 'hsk' | 'toeic' | 'entry' | null;
-  setAppMode: (mode: 'hsk' | 'toeic' | 'entry') => void;
+  appMode: 'hsk' | 'toeic' | 'jlpt' | 'entry' | null;
+  setAppMode: (mode: 'hsk' | 'toeic' | 'jlpt' | 'entry') => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [selectedLevel, setSelectedLevel] = useState<number | 'all'>(1);
+  const [selectedJlptLevel, setSelectedJlptLevel] = useState<'N5'>('N5');
   const [themeMode, setThemeModeState] = useState<'light' | 'dark' | 'black'>('light');
   const [isCarouselView, setIsCarouselView] = useState(false);
   const [hanziWriterMode, setHanziWriterMode] = useState(false);
+  const [jlptKanaWriterMode, setJlptKanaWriterMode] = useState(false);
   const [separateLibraryByLevel, setSeparateLibraryByLevel] = useState(false);
   const [hanziFont, setHanziFontState] = useState('Noto Serif SC');
   const [hanziSize, setHanziSizeState] = useState(3);
   const [hskTtsSpeed, setHskTtsSpeedState] = useState(3);
   const [toeicTtsSpeed, setToeicTtsSpeedState] = useState(3);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [appMode, setAppModeState] = useState<'hsk' | 'toeic' | 'entry' | null>(null);
+  const [appMode, setAppModeState] = useState<'hsk' | 'toeic' | 'jlpt' | 'entry' | null>(null);
 
   useEffect(() => {
     const storedAppMode = localStorage.getItem('appMode');
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAppModeState(storedAppMode === 'hsk' ? 'hsk' : storedAppMode === 'toeic' ? 'toeic' : 'entry');
+    setAppModeState(storedAppMode === 'hsk' ? 'hsk' : storedAppMode === 'toeic' ? 'toeic' : storedAppMode === 'jlpt' ? 'jlpt' : 'entry');
 
     const storedLevel = localStorage.getItem('hsk_level');
     if (storedLevel) {
       setSelectedLevel(storedLevel === 'all' ? 'all' : parseInt(storedLevel, 10));
     }
+
+    localStorage.setItem('jlpt_level', 'N5');
+    setSelectedJlptLevel('N5');
     
     // Fallback for old isDarkMode and new themeMode
     const storedTheme = localStorage.getItem('hsk_theme_mode');
@@ -71,6 +80,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     const storedHanziWriterMode = localStorage.getItem('hsk_hanzi_writer_mode');
     setHanziWriterMode(storedHanziWriterMode === 'true');
+
+    const storedJlptKanaWriterMode = localStorage.getItem('jlpt_kana_writer_mode');
+    setJlptKanaWriterMode(storedJlptKanaWriterMode === 'true');
 
     const storedSeparateLibraryByLevel = localStorage.getItem('hsk_separate_library_by_level');
     setSeparateLibraryByLevel(storedSeparateLibraryByLevel === 'true');
@@ -114,7 +126,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('hsk_level', String(level));
   };
 
-  const setAppMode = (mode: 'hsk' | 'toeic' | 'entry') => {
+  const setJlptLevel = (level: 'N5') => {
+    setSelectedJlptLevel(level);
+    localStorage.setItem('jlpt_level', level);
+  };
+
+  const setAppMode = (mode: 'hsk' | 'toeic' | 'jlpt' | 'entry') => {
     setAppModeState(mode);
     if (mode === 'entry') {
       localStorage.removeItem('appMode');
@@ -184,6 +201,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('hsk_hanzi_writer_mode', String(newValue));
   };
 
+  const toggleJlptKanaWriterMode = () => {
+    const newValue = !jlptKanaWriterMode;
+    setJlptKanaWriterMode(newValue);
+    localStorage.setItem('jlpt_kana_writer_mode', String(newValue));
+  };
+
   const toggleSeparateLibraryByLevel = () => {
     const newValue = !separateLibraryByLevel;
     setSeparateLibraryByLevel(newValue);
@@ -194,6 +217,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     <SettingsContext.Provider value={{ 
       selectedLevel, 
       setLevel, 
+      selectedJlptLevel,
+      setJlptLevel,
       isDarkMode: themeMode !== 'light',
       themeMode,
       setThemeMode,
@@ -207,6 +232,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setToeicTtsSpeed,
       hanziWriterMode, 
       toggleHanziWriterMode, 
+      jlptKanaWriterMode,
+      toggleJlptKanaWriterMode,
       separateLibraryByLevel,
       toggleSeparateLibraryByLevel,
       hanziFont,
