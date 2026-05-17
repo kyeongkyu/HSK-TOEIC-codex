@@ -143,10 +143,16 @@ export default function LibraryPage() {
       ) : (
         <div className="space-y-4">
           {favoriteWords.map(word => (
-            <div 
-              key={word.id} 
+            <div
+              key={word.id}
               className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-5 rounded-2xl flex items-center justify-between group relative overflow-hidden transform-gpu"
             >
+              {(() => {
+                const isJlptKanaMemorize = appMode === 'jlpt' && word.source === 'jlpt-kana' && isMemorizeMode;
+                const isHidden = isMemorizeMode && !revealedWords[word.id];
+
+                return (
+                  <>
               <div className="flex items-center gap-4 z-10 min-w-0 flex-1">
                 <button 
                   onClick={() => toggleFavorite(word.id)}
@@ -166,8 +172,17 @@ export default function LibraryPage() {
                       {word.word}
                     </button>
                     {(appMode === 'toeic' || appMode === 'jlpt') && (
-                      <span className="shrink-0 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-[10px] font-black text-blue-600 dark:text-blue-300 uppercase">
-                        {word.pinyin}
+                      <span
+                        onClick={() => {
+                          if (isJlptKanaMemorize) toggleReveal(word.id);
+                        }}
+                        className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                          isJlptKanaMemorize && isHidden
+                            ? 'cursor-pointer bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
+                            : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
+                        }`}
+                      >
+                        {isJlptKanaMemorize && isHidden ? 'Tap' : word.pinyin}
                       </span>
                     )}
                   </div>
@@ -182,7 +197,9 @@ export default function LibraryPage() {
                   }
                 }}
               >
-                {isMemorizeMode && !revealedWords[word.id] ? (
+                {isJlptKanaMemorize ? (
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300 leading-snug">{word.meaning}</span>
+                ) : isMemorizeMode && !revealedWords[word.id] ? (
                   <div className="min-w-[7.75rem] px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-full text-center">
                     <span className="block whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Tap to reveal</span>
                   </div>
@@ -195,6 +212,9 @@ export default function LibraryPage() {
                   </>
                 )}
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

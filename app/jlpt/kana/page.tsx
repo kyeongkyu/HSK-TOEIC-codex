@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Star, Table2, Volume2 } from 'lucide-react';
+import { JlptInteractiveText } from '@/features/jlpt/JlptInteractiveText';
 import { KanaWriter } from '@/features/jlpt/KanaWriter';
 import { loadJlptKana } from '@/features/data/loaders';
 import { useSettings } from '@/hooks/use-settings';
 import { useUserWords } from '@/hooks/use-user-words';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
-import { getProgressPercent, readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
+import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
 import { speakJapanese } from '@/lib/tts';
 import type { JlptKanaGroup, JlptKanaItem, JlptKanaScript } from '@/data/jlpt/kana';
 
@@ -82,6 +83,7 @@ export default function JlptKanaPage() {
   const { userWords, toggleFavorite } = useUserWords();
   const [script, setScript] = useState<JlptKanaScript>('hiragana');
   const [items, setItems] = useState<JlptKanaItem[]>([]);
+  const [popupKanaItems, setPopupKanaItems] = useState<JlptKanaItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [view, setView] = useState<KanaView>('chart');
   const [group, setGroup] = useState<JlptKanaGroup | 'all'>('all');
@@ -94,9 +96,10 @@ export default function JlptKanaPage() {
     const progress = normalizeProgress(snapshot ?? stored, nextScript);
 
     setIsLoaded(false);
-    void loadJlptKana(nextScript).then((loadedItems) => {
+    void Promise.all([loadJlptKana(nextScript), loadJlptKana('hiragana'), loadJlptKana('katakana')]).then(([loadedItems, hiraganaItems, katakanaItems]) => {
       setScript(nextScript);
       setItems(loadedItems);
+      setPopupKanaItems([...hiraganaItems, ...katakanaItems]);
       setGroup(progress.group);
       setCurrentIndex(clampIndex(progress.currentIndex, loadedItems.length));
       setView(progress.view);
@@ -112,10 +115,11 @@ export default function JlptKanaPage() {
     const progress = normalizeProgress(snapshot ?? stored, nextScript);
     let isCancelled = false;
 
-    void loadJlptKana(nextScript).then((loadedItems) => {
+    void Promise.all([loadJlptKana(nextScript), loadJlptKana('hiragana'), loadJlptKana('katakana')]).then(([loadedItems, hiraganaItems, katakanaItems]) => {
       if (isCancelled) return;
       setScript(nextScript);
       setItems(loadedItems);
+      setPopupKanaItems([...hiraganaItems, ...katakanaItems]);
       setGroup(progress.group);
       setCurrentIndex(clampIndex(progress.currentIndex, loadedItems.length));
       setView(progress.view);
@@ -133,7 +137,6 @@ export default function JlptKanaPage() {
 
   const currentItem = filteredItems[clampIndex(currentIndex, filteredItems.length)];
   const isCurrentFavorite = currentItem ? Boolean(userWords[currentItem.id]?.isFavorite) : false;
-  const progressPercent = useMemo(() => getProgressPercent(currentIndex + 1, filteredItems.length), [currentIndex, filteredItems.length]);
 
   useEffect(() => {
     if (!isLoaded || items.length === 0) return;
@@ -215,18 +218,6 @@ export default function JlptKanaPage() {
           <Table2 size={22} />
         </button>
       </header>
-
-      {view === 'card' && currentItem && (
-        <section className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-black text-gray-500 dark:text-gray-400">{currentIndex + 1}/{filteredItems.length}</span>
-            <span className="text-xs font-black text-indigo-700 dark:text-indigo-300">{progressPercent}%</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-900">
-            <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </section>
-      )}
 
       {view === 'chart' && (
         <>
@@ -339,7 +330,7 @@ export default function JlptKanaPage() {
 
           <section className="rounded-[1.5rem] border border-gray-200 bg-white p-4 shadow-lg shadow-black/5 dark:border-gray-800 dark:bg-gray-950">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Word</p>
+              <span aria-hidden="true" />
               <button
                 type="button"
                 onClick={() => speakJapanese(currentItem.example)}
@@ -349,11 +340,14 @@ export default function JlptKanaPage() {
                 <Volume2 size={17} />
               </button>
             </div>
-            <p className="mt-1 text-2xl font-black">{currentItem.example}</p>
+            <div className="mt-1 text-2xl font-black">
+              <JlptInteractiveText text={currentItem.example} kanaItems={popupKanaItems} fallbackLibraryId={currentItem.id} />
+            </div>
+            <p className="mt-1 text-xs font-black lowercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">{currentItem.exampleRomaji}</p>
             <p className="mt-2 text-sm font-bold text-gray-500 dark:text-gray-400">{currentItem.exampleKo}</p>
             <div className="my-4 h-px bg-gray-100 dark:bg-gray-800" />
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Sentence</p>
+              <span aria-hidden="true" />
               <button
                 type="button"
                 onClick={() => speakJapanese(currentItem.exampleSentenceJa)}
@@ -363,7 +357,10 @@ export default function JlptKanaPage() {
                 <Volume2 size={17} />
               </button>
             </div>
-            <p className="mt-1 text-lg font-black leading-relaxed">{currentItem.exampleSentenceJa}</p>
+            <div className="mt-1 text-lg font-black leading-relaxed">
+              <JlptInteractiveText text={currentItem.exampleSentenceJa} kanaItems={popupKanaItems} fallbackLibraryId={currentItem.id} />
+            </div>
+            <p className="mt-1 text-xs font-black lowercase tracking-[0.08em] text-indigo-700 dark:text-indigo-300">{currentItem.exampleSentenceRomaji}</p>
             <p className="mt-2 text-sm font-bold leading-relaxed text-gray-500 dark:text-gray-400">{currentItem.exampleSentenceKo}</p>
           </section>
 
