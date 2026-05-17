@@ -18,7 +18,7 @@ export function normalizeJlptVocabForLibrary(word: JlptVocabItem): LibraryWord {
     exampleTranslation: word.exampleKo,
     level: 5,
     source: 'jlpt-vocab',
-    speakText: word.word,
+    speakText: word.kana,
     displayStyle: 'kana',
   };
 }

@@ -6,7 +6,7 @@ import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, List, Volume2 } from 'l
 import { loadJlptVocab } from '@/features/data/loaders';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 import { getProgressPercent, writeLocalStorageJson } from '@/lib/ui-state';
-import { speak } from '@/lib/tts';
+import { speakJapanese } from '@/lib/tts';
 import type { JlptVocabItem } from '@/data/jlpt/vocab-n5';
 
 type JlptVocabProgress = {
@@ -66,10 +66,6 @@ export default function JlptVocabPage() {
     writeLocalStorageJson(JLPT_VOCAB_PROGRESS_KEY, progress);
     setResumeTaskSnapshot('/jlpt/vocab', 'JLPT N5 Vocabulary', progress, 'jlpt-vocab');
   }, [currentIndex, isLoaded, viewMode, words.length]);
-
-  const speakJapanese = (text: string) => {
-    speak(text, 3, 'ja-JP');
-  };
 
   if (!isLoaded) {
     return (
@@ -142,7 +138,7 @@ export default function JlptVocabPage() {
               </div>
               <button
                 type="button"
-                onClick={() => speakJapanese(currentWord.word)}
+                onClick={() => speakJapanese(currentWord.kana)}
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 p-3 text-white shadow-xl shadow-indigo-700/20 transition-all active:scale-95"
                 aria-label="Listen to Japanese word"
               >

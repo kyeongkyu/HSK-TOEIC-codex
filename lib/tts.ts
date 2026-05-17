@@ -53,7 +53,7 @@ function getPreferredVoice(voices: SpeechSynthesisVoice[], targetLang: string) {
   return null;
 }
 
-function getVoicesWhenReady(synthesis: SpeechSynthesis) {
+function getVoicesWhenReady(synthesis: SpeechSynthesis, timeoutMs = 350) {
   const voices = synthesis.getVoices();
   if (voices.length > 0) return Promise.resolve(voices);
 
@@ -68,9 +68,155 @@ function getVoicesWhenReady(synthesis: SpeechSynthesis) {
     };
 
     synthesis.addEventListener?.('voiceschanged', finish, { once: true });
-    window.setTimeout(finish, 350);
+    window.setTimeout(finish, timeoutMs);
   });
 }
+
+const JAPANESE_TEXT_PATTERN = /[\u3040-\u30ff\u3400-\u9fff々〆ヵヶー]/;
+const JAPANESE_TEXT_MATCHER = /[\u3040-\u30ff\u3400-\u9fff々〆ヵヶー]/g;
+const NON_JAPANESE_SPEECH_CHARS = /[A-Za-z\uac00-\ud7af]/g;
+
+function countJapaneseCharacters(text: string) {
+  return text.match(JAPANESE_TEXT_MATCHER)?.length ?? 0;
+}
+
+export function normalizeJapaneseForTTS(text: string) {
+  const trimmed = text
+    .normalize('NFKC')
+    .replace(/[｜|]/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!trimmed) return '';
+
+  const bestJapaneseSegment = trimmed
+    .split(/\s*[/／]\s*/)
+    .map(segment => segment.trim())
+    .filter(Boolean)
+    .sort((a, b) => countJapaneseCharacters(b) - countJapaneseCharacters(a))[0] ?? trimmed;
+
+  if (!JAPANESE_TEXT_PATTERN.test(bestJapaneseSegment)) return '';
+
+  return bestJapaneseSegment
+    .replace(NON_JAPANESE_SPEECH_CHARS, '')
+    .replace(/\s+/g, '')
+    .replace(/[，]/g, '、')
+    .replace(/[．]/g, '。')
+    .trim();
+}
+
+function isClearlyNonJapaneseVoice(voice: SpeechSynthesisVoice) {
+  const lang = voice.lang.toLowerCase();
+  const name = voice.name.toLowerCase();
+  return (
+    lang.startsWith('en') ||
+    lang.startsWith('zh') ||
+    lang.startsWith('ko') ||
+    name.includes('english') ||
+    name.includes('chinese') ||
+    name.includes('korean') ||
+    name.includes('mandarin')
+  );
+}
+
+function scoreJapaneseVoice(voice: SpeechSynthesisVoice) {
+  const lang = voice.lang.toLowerCase();
+  const name = voice.name.toLowerCase();
+  let score = 0;
+
+  if (isClearlyNonJapaneseVoice(voice)) score -= 100;
+  if (lang === 'ja-jp') score += 100;
+  if (lang.startsWith('ja')) score += 70;
+  if (name.includes('日本') || name.includes('にほん')) score += 45;
+  if (name.includes('japanese')) score += 40;
+  if (/(kyoko|otoya|haruka|ichiro|ayumi|nanami|sayaka|takumi|mizuki)/.test(name)) score += 30;
+  if (name.includes('google')) score += 18;
+  if (name.includes('microsoft')) score += 16;
+  if (name.includes('natural') || name.includes('enhanced') || name.includes('premium')) score += 10;
+  if (voice.localService) score += 6;
+  if (voice.default) score += 4;
+
+  return score;
+}
+
+export function pickBestJapaneseVoice(voices: SpeechSynthesisVoice[]) {
+  const candidates = voices
+    .map(voice => ({ voice, score: scoreJapaneseVoice(voice) }))
+    .filter(candidate => candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates[0]?.voice ?? null;
+}
+
+function getJapaneseRate(level: number) {
+  const rates: Record<number, number> = {
+    1: 0.72,
+    2: 0.84,
+    3: 0.94,
+    4: 1.04,
+    5: 1.14,
+  };
+
+  return rates[Math.min(Math.max(Math.round(level), 1), 5)] ?? 0.94;
+}
+
+function warnMissingJapaneseVoiceOnce(voices: SpeechSynthesisVoice[]) {
+  if (process.env.NODE_ENV !== 'development') return;
+  const globalWindow = window as Window & { __jlptMissingJapaneseVoiceWarningShown?: boolean };
+  if (globalWindow.__jlptMissingJapaneseVoiceWarningShown) return;
+  globalWindow.__jlptMissingJapaneseVoiceWarningShown = true;
+  console.warn(
+    '[JLPT TTS] Japanese voice was not found. Browser fallback will be used.',
+    voices.map(voice => `${voice.name} (${voice.lang})`),
+  );
+}
+
+export const speakJapanese = (text: string, level: number = 3, onEnd?: () => void) => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    onEnd?.();
+    return;
+  }
+
+  const normalizedText = normalizeJapaneseForTTS(text);
+  if (!normalizedText) {
+    onEnd?.();
+    return;
+  }
+
+  const synthesis = window.speechSynthesis;
+
+  void getVoicesWhenReady(synthesis, 2200).then((voices) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      onEnd?.();
+      return;
+    }
+
+    safelyPrepareSpeech(synthesis);
+
+    const utterance = new SpeechSynthesisUtterance(normalizedText);
+    const preferredVoice = pickBestJapaneseVoice(voices);
+
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+      utterance.lang = preferredVoice.lang || 'ja-JP';
+    } else {
+      utterance.lang = 'ja-JP';
+      warnMissingJapaneseVoiceOnce(voices);
+    }
+
+    utterance.rate = getJapaneseRate(level);
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onend = () => onEnd?.();
+    utterance.onerror = () => onEnd?.();
+
+    try {
+      synthesis.speak(utterance);
+    } catch {
+      onEnd?.();
+    }
+  });
+};
 
 function speakWithVoices(text: string, level: number, targetLang: string, voices: SpeechSynthesisVoice[], onEnd?: () => void) {
   if (typeof window === 'undefined' || !window.speechSynthesis) {

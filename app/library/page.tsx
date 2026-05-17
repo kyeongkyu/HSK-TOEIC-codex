@@ -3,7 +3,7 @@ import { useUserWords } from '@/hooks/use-user-words';
 import Link from 'next/link';
 import { Star, BookOpen, Brain, CheckSquare } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
-import { speak } from '@/lib/tts';
+import { speak, speakJapanese } from '@/lib/tts';
 import { useSettings } from '@/hooks/use-settings';
 import type { LibraryWord } from '@/features/jlpt/library';
 import { normalizeJlptKanaForLibrary, normalizeJlptVocabForLibrary } from '@/features/jlpt/library';
@@ -59,9 +59,16 @@ export default function LibraryPage() {
 
   const handleSpeakWord = (word: LibraryWord) => {
     setSpeakingWordId(word.id);
-    speak(word.speakText ?? word.word, ttsSpeed, appMode === 'toeic' ? 'en-US' : appMode === 'jlpt' ? 'ja-JP' : 'zh-CN', () => {
+    const handleEnd = () => {
       setSpeakingWordId(current => current === word.id ? null : current);
-    });
+    };
+
+    if (appMode === 'jlpt') {
+      speakJapanese(word.speakText ?? word.word, ttsSpeed, handleEnd);
+      return;
+    }
+
+    speak(word.speakText ?? word.word, ttsSpeed, appMode === 'toeic' ? 'en-US' : 'zh-CN', handleEnd);
   };
 
   const favoriteWords = useMemo(() => {

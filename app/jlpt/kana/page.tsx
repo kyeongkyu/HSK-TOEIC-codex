@@ -8,7 +8,7 @@ import { useSettings } from '@/hooks/use-settings';
 import { useUserWords } from '@/hooks/use-user-words';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 import { getProgressPercent, readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
-import { speak } from '@/lib/tts';
+import { speakJapanese } from '@/lib/tts';
 import type { JlptKanaGroup, JlptKanaItem, JlptKanaScript } from '@/data/jlpt/kana';
 
 type KanaView = 'chart' | 'card';
@@ -149,10 +149,6 @@ export default function JlptKanaPage() {
     setResumeTaskSnapshot(route, getLabel(script), progress, getTaskKey(script));
   }, [currentIndex, filteredItems.length, group, isLoaded, items.length, script, view]);
 
-  const speakJapanese = (text: string) => {
-    speak(text, 3, 'ja-JP');
-  };
-
   const goBackToKanaHome = () => {
     sessionStorage.setItem('jlpt_home_mode_intent', getHomeModeIntent(script));
     window.location.assign('/');
@@ -174,6 +170,16 @@ export default function JlptKanaPage() {
   const openCard = (item: JlptKanaItem) => {
     const index = filteredItems.findIndex(candidate => candidate.id === item.id);
     setCurrentIndex(clampIndex(index, filteredItems.length));
+    setView('card');
+  };
+
+  const toggleCardChartView = () => {
+    if (view === 'card') {
+      setView('chart');
+      return;
+    }
+
+    setCurrentIndex(index => clampIndex(index, filteredItems.length));
     setView('card');
   };
 
@@ -202,13 +208,25 @@ export default function JlptKanaPage() {
         </div>
         <button
           type="button"
-          onClick={() => view === 'card' && currentItem ? speakJapanese(currentItem.kana) : setView('chart')}
+          onClick={toggleCardChartView}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition-all active:scale-95 dark:border-gray-800 dark:bg-gray-950"
-          aria-label={view === 'card' ? 'Listen to current kana' : 'Show chart'}
+          aria-label={view === 'card' ? 'Show chart' : 'Show card'}
         >
-          {view === 'card' ? <Volume2 size={22} /> : <Table2 size={22} />}
+          <Table2 size={22} />
         </button>
       </header>
+
+      {view === 'card' && currentItem && (
+        <section className="mb-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-black text-gray-500 dark:text-gray-400">{currentIndex + 1}/{filteredItems.length}</span>
+            <span className="text-xs font-black text-indigo-700 dark:text-indigo-300">{progressPercent}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-900">
+            <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </section>
+      )}
 
       {view === 'chart' && (
         <>
@@ -295,33 +313,57 @@ export default function JlptKanaPage() {
               </button>
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">{currentItem.group} · {currentItem.row}</p>
               {jlptKanaWriterMode ? (
-                <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => speakJapanese(currentItem.kana)}
+                  className="mt-4 block w-full rounded-[1.75rem] text-left transition-all active:scale-[0.99]"
+                  aria-label="Listen to current kana"
+                >
                   <KanaWriter kana={currentItem.kana} romaji={currentItem.romaji} />
-                </div>
+                </button>
               ) : (
                 <>
-                  <h2 className="mt-3 text-8xl font-black leading-none">{currentItem.kana}</h2>
-                  <p className="mt-3 text-3xl font-black text-indigo-700 dark:text-indigo-300">{currentItem.romaji}</p>
+                  <button
+                    type="button"
+                    onClick={() => speakJapanese(currentItem.kana)}
+                    className="mx-auto mt-3 block rounded-[2rem] px-5 py-3 transition-all active:scale-[0.98]"
+                    aria-label="Listen to current kana"
+                  >
+                    <span className="block text-8xl font-black leading-none">{currentItem.kana}</span>
+                  </button>
+                  <p className="mt-1 text-3xl font-black text-indigo-700 dark:text-indigo-300">{currentItem.romaji}</p>
                 </>
               )}
-              <button
-                type="button"
-                onClick={() => speakJapanese(currentItem.kana)}
-                className="mx-auto mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-sm font-black text-white shadow-xl shadow-indigo-700/20 transition-all active:scale-95"
-              >
-                <Volume2 size={20} />
-                Listen
-              </button>
             </div>
           </section>
 
           <section className="rounded-[1.5rem] border border-gray-200 bg-white p-4 shadow-lg shadow-black/5 dark:border-gray-800 dark:bg-gray-950">
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Word</p>
-            <p className="mt-2 text-2xl font-black">{currentItem.example}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Word</p>
+              <button
+                type="button"
+                onClick={() => speakJapanese(currentItem.example)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition-all active:scale-95 dark:bg-indigo-950/40 dark:text-indigo-300"
+                aria-label="Listen to example word"
+              >
+                <Volume2 size={17} />
+              </button>
+            </div>
+            <p className="mt-1 text-2xl font-black">{currentItem.example}</p>
             <p className="mt-2 text-sm font-bold text-gray-500 dark:text-gray-400">{currentItem.exampleKo}</p>
             <div className="my-4 h-px bg-gray-100 dark:bg-gray-800" />
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Sentence</p>
-            <p className="mt-2 text-lg font-black leading-relaxed">{currentItem.exampleSentenceJa}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example Sentence</p>
+              <button
+                type="button"
+                onClick={() => speakJapanese(currentItem.exampleSentenceJa)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition-all active:scale-95 dark:bg-indigo-950/40 dark:text-indigo-300"
+                aria-label="Listen to example sentence"
+              >
+                <Volume2 size={17} />
+              </button>
+            </div>
+            <p className="mt-1 text-lg font-black leading-relaxed">{currentItem.exampleSentenceJa}</p>
             <p className="mt-2 text-sm font-bold leading-relaxed text-gray-500 dark:text-gray-400">{currentItem.exampleSentenceKo}</p>
           </section>
 
@@ -330,7 +372,7 @@ export default function JlptKanaPage() {
               type="button"
               onClick={() => setCurrentIndex(index => clampIndex(index - 1, filteredItems.length))}
               disabled={currentIndex === 0}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 font-black shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-950"
+              className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 font-black shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-950"
             >
               <ChevronLeft size={20} />
               Prev
@@ -338,7 +380,7 @@ export default function JlptKanaPage() {
             <button
               type="button"
               onClick={() => setView('chart')}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-black text-gray-700 shadow-sm transition-all active:scale-95 dark:bg-gray-900 dark:text-gray-300"
+              className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-gray-100 px-4 py-4 text-sm font-black text-gray-700 shadow-sm transition-all active:scale-95 dark:bg-gray-900 dark:text-gray-300"
             >
               <Table2 size={18} />
               {currentIndex + 1}/{filteredItems.length}
@@ -347,16 +389,13 @@ export default function JlptKanaPage() {
               type="button"
               onClick={() => setCurrentIndex(index => clampIndex(index + 1, filteredItems.length))}
               disabled={currentIndex === filteredItems.length - 1}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-black px-4 py-3 font-black text-white shadow-xl shadow-black/20 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
+              className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-black px-4 py-4 font-black text-white shadow-xl shadow-black/20 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
             >
               Next
               <ChevronRight size={20} />
             </button>
           </div>
 
-          <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-900">
-            <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
         </main>
       )}
     </div>

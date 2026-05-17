@@ -489,8 +489,8 @@ export default function Home() {
                     item.disabled
                       ? 'cursor-not-allowed text-gray-400 dark:text-gray-600'
                       : ('mode' in item && item.mode === jlptHomeMode)
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-indigo-50 text-indigo-800 shadow-sm dark:bg-indigo-500/15 dark:text-indigo-200'
+                        ? 'bg-white text-black dark:bg-gray-950 dark:text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
                   }`}
                 >
                   <span className="font-black">{item.label}</span>
@@ -499,16 +499,29 @@ export default function Home() {
                       Coming soon
                     </span>
                   ) : 'mode' in item && item.mode === jlptHomeMode ? (
-                    <span className="rounded-full bg-white/20 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+                    <span className="rounded-full bg-black px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white dark:bg-white dark:text-black">
                       Selected
                     </span>
                   ) : (
-                    <span className="rounded-full bg-indigo-600 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+                    <span className="rounded-full border border-gray-300 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-600 dark:border-gray-700 dark:text-gray-300">
                       Active
                     </span>
                   )}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsJlptMenuOpen(false);
+                  setAppMode('entry');
+                }}
+                className="mt-1 flex w-full items-center justify-between border-t border-gray-200 px-4 py-3 text-left text-gray-700 transition-all hover:bg-gray-50 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-900"
+              >
+                <span className="font-black">Main</span>
+                <span className="rounded-full border border-gray-300 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  Switch
+                </span>
+              </button>
             </div>
           )}
         </div>
