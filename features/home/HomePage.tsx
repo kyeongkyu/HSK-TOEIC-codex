@@ -1,27 +1,23 @@
-'use client';
+﻿'use client';
 import { useUserWords } from '@/hooks/use-user-words';
 import { useSettings } from '@/hooks/use-settings';
-import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
-import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import { motion, useMotionValue, useTransform, animate, PanInfo, AnimatePresence } from 'motion/react';
+import { motion, useMotionValue, animate, PanInfo, AnimatePresence } from 'motion/react';
 import { BookOpen, Brain, CheckSquare, ChevronDown, ChevronRight, PenTool, ArrowLeft, Briefcase, Monitor, Users, ShoppingCart, Landmark, TrendingUp, Utensils, Plane, Building, Megaphone, Headphones, Database, Truck, FileText, Factory, Calendar, ShieldCheck, Volume2, Star, X, Languages } from 'lucide-react';
 import { speak } from '@/lib/tts';
 import type { WordData } from '@/lib/srs';
-import { markNavigationStart } from '@/lib/navigation-performance';
 import { loadHskWords, loadJlptVocab, loadToeicWords } from '@/features/data/loaders';
 import {
-  getResumeTaskMeta,
   getResumeTaskSnapshot,
-  markResumeTaskFreshStart,
   setResumeTaskSnapshot,
-  type ResumeTaskKey,
-  type ResumeTaskMeta,
 } from '@/lib/resume-task';
-import { ResumePromptDialog, type PendingResumePrompt } from './ResumePromptDialog';
+import { ResumePromptDialog } from './ResumePromptDialog';
+import { CarouselCard, type CarouselCardData, OFFSET } from './CarouselCard';
+import { useHomeResumePrompt } from './useHomeResumePrompt';
 import { getHskHomeStats, groupWordsByTopic } from './home-selectors';
+import { getJlptHomeConfig, jlptMenuItems, type JlptHomeMode } from './jlpt-home-config';
 
 const EntryScreen = dynamic(
   () => import('@/components/entry-screen').then((module) => module.EntryScreen),
@@ -35,95 +31,26 @@ const EntryScreen = dynamic(
   },
 );
 
-const CARD_WIDTH = 280;
-const GAP = 16;
-const OFFSET = CARD_WIDTH + GAP;
-
 type ToeicWord = WordData & {
   topicId: string;
   phonetic?: string;
 };
 
-type CarouselCardData = {
-  title: string;
-  description: string;
-  link: string;
-  taskKey?: ResumeTaskKey;
-  accentClass: string;
-  iconClass: string;
-  surfaceClass: string;
-  icon: ReactNode;
-};
 type ToeicVocabResumeSnapshot = {
   selectedToeicTopicId: string | null;
   toeicWordIndex: number;
   toeicStudyMode: 'focus' | 'list';
   showToeicTopics: boolean;
 };
-type CarouselCardMotionValue = ReturnType<typeof useMotionValue<number>>;
-
-function CarouselCard({ card, index, x, currentIndex, onStart, onPrefetch }: { card: CarouselCardData, index: number, x: CarouselCardMotionValue, currentIndex: number, onStart: (card: CarouselCardData) => void, onPrefetch: (card: CarouselCardData) => void }) {
-  const inputRange = [-(index + 1) * OFFSET, -index * OFFSET, -(index - 1) * OFFSET];
-  
-  const scale = useTransform(x, inputRange, [0.85, 1, 0.85]);
-  const opacity = useTransform(x, inputRange, [0.5, 1, 0.5]);
-  const zIndex = useTransform(x, inputRange, [0, 10, 0]);
-  const shadow = useTransform(
-    x, 
-    inputRange, 
-    ["0px 8px 20px rgba(15,23,42,0.04)", "0px 18px 36px rgba(15,23,42,0.12)", "0px 8px 20px rgba(15,23,42,0.04)"]
-  );
-
-  return (
-    <motion.div
-      style={{
-        width: CARD_WIDTH,
-        scale,
-        opacity,
-        zIndex,
-        boxShadow: shadow,
-      }}
-      className={`relative shrink-0 h-64 rounded-[1.5rem] bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-5 flex flex-col justify-between transform-gpu will-change-transform overflow-hidden ${card.surfaceClass}`}
-    >
-      <div className="flex justify-between items-start">
-        <div className="space-y-0.5">
-          <h3 className="text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest">Mode</h3>
-          <h2 className="text-gray-950 dark:text-white text-2xl font-black">{card.title}</h2>
-        </div>
-        <div className={`shrink-0 rounded-2xl p-3 ${card.iconClass}`}>
-          {card.icon}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <p className="text-gray-500 dark:text-gray-300 text-sm font-medium leading-relaxed break-keep">
-          {card.description}
-        </p>
-        
-        <button
-          type="button"
-          onClick={() => onStart(card)}
-          onPointerEnter={() => onPrefetch(card)}
-          onFocus={() => onPrefetch(card)}
-          className={`inline-flex items-center gap-1.5 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:scale-105 active:scale-95 transition-all text-sm pointer-events-auto transform-gpu ${card.accentClass}`}
-        >
-          Start Now
-          <ChevronRight size={16} />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
 
 export default function Home() {
-  const router = useRouter();
   const { userWords, toggleFavorite, isLoaded: wordsLoaded } = useUserWords();
-  const { selectedLevel, setLevel, selectedJlptLevel, isCarouselView, isLoaded: settingsLoaded, appMode, setAppMode, ttsSpeed } = useSettings();
+  const { selectedLevel, setLevel, selectedJlptLevel, setJlptLevel, isCarouselView, isLoaded: settingsLoaded, appMode, setAppMode, ttsSpeed } = useSettings();
   const [now, setNow] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isLevelMenuOpen, setIsLevelMenuOpen] = useState(false);
   const [isJlptMenuOpen, setIsJlptMenuOpen] = useState(false);
-  const [jlptHomeMode, setJlptHomeMode] = useState<'vocab-n5' | 'kana-hiragana' | 'kana-katakana'>('vocab-n5');
+  const [jlptHomeMode, setJlptHomeMode] = useState<JlptHomeMode>('vocab-n5');
   const [showToeicTopics, setShowToeicTopics] = useState(false);
   const [selectedToeicTopicId, setSelectedToeicTopicId] = useState<string | null>(null);
   const [toeicWordIndex, setToeicWordIndex] = useState(0);
@@ -133,8 +60,14 @@ export default function Home() {
   const [toeicWords, setToeicWords] = useState<ToeicWord[]>([]);
   const [jlptVocabCount, setJlptVocabCount] = useState(0);
   const [cardIndex, setCardIndex] = useState(0);
-  const [pendingResumePrompt, setPendingResumePrompt] = useState<PendingResumePrompt | null>(null);
   const x = useMotionValue(0);
+  const {
+    pendingResumePrompt,
+    closeResumePrompt,
+    openRouteFromStart,
+    prefetchTaskRoute,
+    openTaskWithResumePrompt,
+  } = useHomeResumePrompt({ selectedLevel, selectedJlptLevel });
 
   useEffect(() => {
     if (appMode !== 'hsk') return;
@@ -168,11 +101,21 @@ export default function Home() {
 
   useEffect(() => {
     if (appMode !== 'jlpt') return;
+    if (jlptHomeMode === 'vocab-n4' || jlptHomeMode === 'vocab-n5') {
+      const desiredMode = selectedJlptLevel === 'N4' ? 'vocab-n4' : 'vocab-n5';
+      if (jlptHomeMode !== desiredMode) {
+        globalThis.setTimeout(() => setJlptHomeMode(desiredMode), 0);
+      }
+    }
 
     const intendedMode = sessionStorage.getItem('jlpt_home_mode_intent');
-    if (intendedMode === 'vocab-n5' || intendedMode === 'kana-hiragana' || intendedMode === 'kana-katakana') {
+    if (intendedMode === 'vocab-n5' || intendedMode === 'vocab-n4' || intendedMode === 'kana-hiragana' || intendedMode === 'kana-katakana') {
       sessionStorage.removeItem('jlpt_home_mode_intent');
-      globalThis.setTimeout(() => setJlptHomeMode(intendedMode), 0);
+      globalThis.setTimeout(() => {
+        setJlptHomeMode(intendedMode);
+        if (intendedMode === 'vocab-n4') setJlptLevel('N4');
+        if (intendedMode === 'vocab-n5') setJlptLevel('N5');
+      }, 0);
     }
 
     let isCancelled = false;
@@ -185,7 +128,9 @@ export default function Home() {
     return () => {
       isCancelled = true;
     };
-  }, [appMode, selectedJlptLevel]);
+  // setJlptLevel is intentionally omitted because SettingsContext provides an un-memoized setter.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode, jlptHomeMode, selectedJlptLevel]);
 
   const toeicWordsByTopic = useMemo(() => groupWordsByTopic(toeicWords), [toeicWords]);
 
@@ -310,49 +255,6 @@ export default function Home() {
     }
   };
 
-  const openRouteFromStart = (route: string, taskKey?: ResumeTaskKey) => {
-    markResumeTaskFreshStart(route, taskKey);
-    markNavigationStart(route);
-    router.push(route);
-  };
-
-  const prefetchTaskRoute = (route: string) => {
-    router.prefetch(route);
-  };
-
-  const openTaskWithResumePrompt = (
-    taskKey: ResumeTaskKey | undefined,
-    freshLabel: string,
-    onFreshStart: () => void,
-    onResume?: (meta: ResumeTaskMeta) => void,
-  ) => {
-    if (!taskKey) {
-      onFreshStart();
-      return;
-    }
-
-    const meta = getResumeTaskMeta(taskKey);
-    if (!meta || (meta.appMode === 'hsk' && meta.levelScope !== selectedLevel)) {
-      onFreshStart();
-      return;
-    }
-
-    setPendingResumePrompt({
-      meta,
-      freshLabel,
-      onFreshStart,
-      onResume: () => {
-        if (onResume) {
-          markNavigationStart(meta.route);
-          onResume(meta);
-        } else {
-          markNavigationStart(meta.route);
-          router.push(meta.route);
-        }
-      },
-    });
-  };
-
   const handleHskCardStart = (card: CarouselCardData) => {
     openTaskWithResumePrompt(
       card.taskKey,
@@ -407,53 +309,7 @@ export default function Home() {
   }
 
   if (appMode === 'jlpt') {
-    const jlptMenuItems = [
-      { label: 'JLPT N1', disabled: true },
-      { label: 'JLPT N2', disabled: true },
-      { label: 'JLPT N3', disabled: true },
-      { label: 'JLPT N4', disabled: true },
-      { label: 'JLPT N5', disabled: false, mode: 'vocab-n5' as const },
-      { label: 'Hiragana', disabled: false, mode: 'kana-hiragana' as const },
-      { label: 'Katakana', disabled: false, mode: 'kana-katakana' as const },
-    ];
-    const jlptHomeConfig = {
-      'vocab-n5': {
-        eyebrow: 'Vocabulary',
-        title: 'JLPT N5',
-        subtitle: 'ことば',
-        description: '히라가나, 발음, 뜻, 예문을 한 카드에서 확인하며 N5 기초 단어를 익혀보세요.',
-        statLabel: 'Seed Words',
-        statValue: jlptVocabCount,
-        buttonLabel: 'N5 단어 학습하기',
-        route: '/jlpt/vocab',
-        taskKey: 'jlpt-vocab' as const,
-        resumeLabel: 'JLPT N5 Vocabulary',
-      },
-      'kana-hiragana': {
-        eyebrow: 'Kana',
-        title: 'Hiragana',
-        subtitle: 'ひらがな',
-        description: '기본음, 탁음, 요음까지 히라가나 전체 표를 보고 글자별 카드로 발음과 예시를 학습하세요.',
-        statLabel: 'Kana Set',
-        statValue: 'Chart',
-        buttonLabel: '히라가나 학습하기',
-        route: '/jlpt/kana?script=hiragana',
-        taskKey: 'jlpt-kana-hiragana' as const,
-        resumeLabel: 'Hiragana',
-      },
-      'kana-katakana': {
-        eyebrow: 'Kana',
-        title: 'Katakana',
-        subtitle: 'カタカナ',
-        description: '외래어와 강조 표현에 자주 쓰이는 가타카나를 표와 카드 중심으로 익혀보세요.',
-        statLabel: 'Kana Set',
-        statValue: 'Chart',
-        buttonLabel: '가타카나 학습하기',
-        route: '/jlpt/kana?script=katakana',
-        taskKey: 'jlpt-kana-katakana' as const,
-        resumeLabel: 'Katakana',
-      },
-    }[jlptHomeMode];
+    const jlptHomeConfig = getJlptHomeConfig(jlptHomeMode, selectedJlptLevel, jlptVocabCount);
 
     return (
       <div className="min-h-[calc(100vh-160px)] overflow-x-hidden bg-white px-5 py-5 text-black transition-colors duration-200 dark:bg-black dark:text-white">
@@ -469,46 +325,51 @@ export default function Home() {
               <span className="mt-2 block text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">{jlptHomeConfig.eyebrow}</span>
             </span>
             <span className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-              <ChevronDown size={18} className={`transition-transform duration-200 ${isJlptMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={18} className={isJlptMenuOpen ? 'transition-transform duration-200 rotate-180' : 'transition-transform duration-200'} />
             </span>
           </button>
 
           {isJlptMenuOpen && (
             <div className="absolute left-0 right-0 top-full z-[80] mt-3 overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white p-2 shadow-2xl shadow-black/10 animate-in fade-in slide-in-from-top-2 duration-200 dark:border-gray-800 dark:bg-gray-950 dark:shadow-black/35">
-              {jlptMenuItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  disabled={item.disabled}
-                  onClick={() => {
-                    if (item.disabled) return;
-                    if ('mode' in item && item.mode) setJlptHomeMode(item.mode);
-                    setIsJlptMenuOpen(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-all ${
-                    item.disabled
-                      ? 'cursor-not-allowed text-gray-400 dark:text-gray-600'
-                      : ('mode' in item && item.mode === jlptHomeMode)
-                        ? 'bg-white text-black dark:bg-gray-950 dark:text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
-                  }`}
-                >
-                  <span className="font-black">{item.label}</span>
-                  {item.disabled ? (
-                    <span className="rounded-full border border-gray-200 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:border-gray-800 dark:text-gray-500">
-                      Coming soon
-                    </span>
-                  ) : 'mode' in item && item.mode === jlptHomeMode ? (
-                    <span className="rounded-full bg-black px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white dark:bg-white dark:text-black">
-                      Selected
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-gray-300 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-600 dark:border-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  )}
-                </button>
-              ))}
+              {jlptMenuItems.map((item) => {
+                const isSelected = 'mode' in item && item.mode === jlptHomeMode;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    disabled={item.disabled}
+                    onClick={() => {
+                      if (item.disabled) return;
+                      if ('level' in item && item.level) setJlptLevel(item.level);
+                      if ('mode' in item && item.mode) setJlptHomeMode(item.mode);
+                      setIsJlptMenuOpen(false);
+                    }}
+                    className={[
+                      'flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-all',
+                      item.disabled
+                        ? 'cursor-not-allowed text-gray-400 dark:text-gray-600'
+                        : isSelected
+                          ? 'bg-white text-black dark:bg-gray-950 dark:text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900'
+                    ].join(' ')}
+                  >
+                    <span className="font-black">{item.label}</span>
+                    {item.disabled ? (
+                      <span className="rounded-full border border-gray-200 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                        Coming soon
+                      </span>
+                    ) : isSelected ? (
+                      <span className="rounded-full bg-black px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white dark:bg-white dark:text-black">
+                        Selected
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-gray-300 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                        Active
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
               <button
                 type="button"
                 onClick={() => {
@@ -560,7 +421,7 @@ export default function Home() {
           </div>
         </section>
 
-        <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={() => setPendingResumePrompt(null)} />
+        <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={closeResumePrompt} />
       </div>
     );
   }
@@ -581,7 +442,7 @@ export default function Home() {
       { id: "manufacturing-quality", title: "12. Manufacturing & Quality", subtitle: "생산, 검사, 결함, 공정", icon: <Factory size={28} /> },
       { id: "meetings-scheduling", title: "13. Meetings & Scheduling", subtitle: "일정, 회의, 조율, 변경", icon: <Calendar size={28} /> },
       { id: "travel-trips", title: "14. Travel & Business Trips", subtitle: "출장, 예약, 일정 이동", icon: <Plane size={28} /> },
-      { id: "events-hospitality", title: "15. Events & Hospitality", subtitle: "행사, 음식, 서비스", icon: <Utensils size={28} /> },
+      { id: "events-hospitality", title: "15. Events & Hospitality", subtitle: "행사, 회식, 서비스", icon: <Utensils size={28} /> },
       { id: "real-estate-construction", title: "16. Real Estate & Construction", subtitle: "건물, 임대, 공사", icon: <Building size={28} /> },
       { id: "healthcare-safety", title: "17. Healthcare & Safety", subtitle: "의료와 산업 안전", icon: <ShieldCheck size={28} /> }
     ];
@@ -999,7 +860,7 @@ export default function Home() {
             ))}
           </motion.div>
         )}
-        <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={() => setPendingResumePrompt(null)} />
+        <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={closeResumePrompt} />
       </div>
     );
   }
@@ -1104,7 +965,7 @@ export default function Home() {
             className="flex items-center gap-4 cursor-grab active:cursor-grabbing w-max"
           >
             {cards.map((card, i) => (
-              <CarouselCard key={i} card={card} index={i} x={x} currentIndex={cardIndex} onStart={handleHskCardStart} onPrefetch={(prefetchCard) => prefetchTaskRoute(prefetchCard.link)} />
+              <CarouselCard key={i} card={card} index={i} x={x} onStart={handleHskCardStart} onPrefetch={(prefetchCard) => prefetchTaskRoute(prefetchCard.link)} />
             ))}
           </motion.div>
 
@@ -1148,8 +1009,9 @@ export default function Home() {
           ))}
         </div>
       )}
-      <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={() => setPendingResumePrompt(null)} />
+      <ResumePromptDialog prompt={pendingResumePrompt} isClient={isClient} onClose={closeResumePrompt} />
     </div>
   );
 }
+
 

@@ -32,7 +32,16 @@ import { formatPinyin } from '@/lib/pinyin';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { getProgressPercent } from '@/lib/ui-state';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot, shouldSaveActiveResumeSnapshot } from '@/lib/resume-task';
-import { clampQuestionIndex, findQuestionIndexById } from '@/features/listening/session';
+import {
+  clampQuestionIndex,
+  DEFAULT_HSK_LISTENING_PROGRESS,
+  findQuestionIndexById,
+  getHskListeningReviewIds,
+  getHskListeningSetProgressKey,
+  isHskListeningAnswerCorrect,
+  normalizeHskListeningProgress,
+  type HskListeningProgressState,
+} from '@/features/listening/session';
 
 type Step = 'topic' | 'mode' | 'review-filter' | 'questions' | 'results';
 type StudyMode = 'practice' | 'quiz' | 'review';
@@ -51,20 +60,7 @@ type HskListeningResumeSnapshot = {
   sessionPlayCounts: Record<string, number>;
 };
 
-type ProgressState = {
-  attempts: HskListeningAttempt[];
-  bookmarkedIds: string[];
-  replayCounts: Record<string, number>;
-  savedSetProgress: Record<string, { currentIndex: number }>;
-};
-
 const STORAGE_KEY = 'hsk_listening_progress';
-const DEFAULT_PROGRESS: ProgressState = {
-  attempts: [],
-  bookmarkedIds: [],
-  replayCounts: {},
-  savedSetProgress: {},
-};
 const TOPICS = Object.keys(HSK_LISTENING_TOPIC_META) as HskListeningTopic[];
 
 const MODE_META: Record<StudyMode, { label: string; description: string }> = {
@@ -73,83 +69,15 @@ const MODE_META: Record<StudyMode, { label: string; description: string }> = {
   review: { label: 'Review', description: 'Return to incorrect, replayed, or bookmarked listening questions.' },
 };
 
-function normalizeProgress(stored: unknown): ProgressState {
-  if (!stored || typeof stored !== 'object') return DEFAULT_PROGRESS;
-  const parsed = stored as Partial<ProgressState>;
-  return {
-    attempts: Array.isArray(parsed.attempts) ? parsed.attempts : [],
-    bookmarkedIds: Array.isArray(parsed.bookmarkedIds) ? parsed.bookmarkedIds : [],
-    replayCounts: parsed.replayCounts && typeof parsed.replayCounts === 'object' ? parsed.replayCounts : {},
-    savedSetProgress: parsed.savedSetProgress && typeof parsed.savedSetProgress === 'object' ? parsed.savedSetProgress : {},
-  };
-}
-
-function normalizeAnswer(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[，。！？,.!?\s]/g, '')
-    .trim();
-}
-
-function isAnswerCorrect(question: HskListeningQuestion, selectedAnswer: string) {
-  const expected = normalizeAnswer(question.answer);
-  const selected = normalizeAnswer(selectedAnswer);
-
-  if (question.activityType === 'dictation') {
-    return selected === expected || selected === normalizeAnswer(question.pinyin);
-  }
-
-  return selected === expected;
-}
-
-function getReviewIds(progress: ProgressState, filter: HskListeningReviewFilter) {
-  const ids = new Set<string>();
-
-  if (filter === 'bookmarked') {
-    progress.bookmarkedIds.forEach((id) => ids.add(id));
-    return ids;
-  }
-
-  if (filter === 'replayed_often') {
-    Object.entries(progress.replayCounts).forEach(([id, count]) => {
-      if (count >= 3) ids.add(id);
-    });
-    return ids;
-  }
-
-  const wrongCounts = progress.attempts.reduce<Record<string, number>>((counts, attempt) => {
-    if (!attempt.correct) counts[attempt.questionId] = (counts[attempt.questionId] ?? 0) + 1;
-    return counts;
-  }, {});
-
-  Object.entries(wrongCounts).forEach(([id, count]) => {
-    if (filter === 'incorrect_only' && count > 0) ids.add(id);
-    if (filter === 'frequently_missed' && count >= 2) ids.add(id);
-  });
-
-  return ids;
-}
-
 function activityBadge(activityType: HskListeningActivityType) {
   return activityType.replace(/_/g, ' ');
-}
-
-function getSetProgressKey(
-  level: HskListeningLevel,
-  topic: HskListeningTopic,
-  mode: Exclude<StudyMode, 'review'> | 'review',
-  filter?: HskListeningReviewFilter,
-) {
-  return mode === 'review'
-    ? `${level}:${topic}:review:${filter ?? 'all'}`
-    : `${level}:${topic}:${mode}`;
 }
 
 export default function HskListeningPage() {
   const tts = useHskTTS();
   const { selectedLevel: homeSelectedLevel } = useSettings();
   const stopTts = tts.stop;
-  const [progress, setProgress] = useState<ProgressState>(DEFAULT_PROGRESS);
+  const [progress, setProgress] = useState<HskListeningProgressState>(DEFAULT_HSK_LISTENING_PROGRESS);
   const [step, setStep] = useState<Step>('topic');
   const [selectedTopic, setSelectedTopic] = useState<HskListeningTopic | null>(null);
   const [selectedMode, setSelectedMode] = useState<StudyMode | null>(null);
@@ -172,9 +100,9 @@ export default function HskListeningPage() {
       if (!stored) return;
 
       try {
-        setProgress(normalizeProgress(JSON.parse(stored)));
+        setProgress(normalizeHskListeningProgress(JSON.parse(stored)));
       } catch {
-        setProgress(DEFAULT_PROGRESS);
+        setProgress(DEFAULT_HSK_LISTENING_PROGRESS);
       }
     }, 0);
 
@@ -197,7 +125,7 @@ export default function HskListeningPage() {
 
   useEffect(() => () => stopTts(), [stopTts]);
 
-  const saveProgress = (nextProgress: ProgressState) => {
+  const saveProgress = (nextProgress: HskListeningProgressState) => {
     setProgress(nextProgress);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProgress));
   };
@@ -260,7 +188,7 @@ export default function HskListeningPage() {
     }
 
     return (Object.keys(HSK_LISTENING_REVIEW_META) as HskListeningReviewFilter[]).reduce<Record<HskListeningReviewFilter, HskListeningQuestion[]>>((next, filter) => {
-      const ids = getReviewIds(progress, filter);
+      const ids = getHskListeningReviewIds(progress, filter);
       next[filter] = HSK_LISTENING_QUESTIONS.filter((question) => (
         question.level === selectedLevel &&
         question.topic === selectedTopic &&
@@ -296,7 +224,7 @@ export default function HskListeningPage() {
     }
 
     if (!reviewFilter) return [];
-    const ids = getReviewIds(progress, reviewFilter);
+    const ids = getHskListeningReviewIds(progress, reviewFilter);
     return HSK_LISTENING_QUESTIONS.filter((question) => (
       question.level === selectedLevel &&
       question.topic === selectedTopic &&
@@ -307,7 +235,7 @@ export default function HskListeningPage() {
   const currentQuestion = questions[currentIndex];
   const isBookmarked = currentQuestion ? progress.bookmarkedIds.includes(currentQuestion.id) : false;
   const currentPlayCount = currentQuestion ? (sessionPlayCounts[currentQuestion.id] ?? 0) : 0;
-  const isCurrentCorrect = currentQuestion ? isAnswerCorrect(currentQuestion, selectedAnswer) : false;
+  const isCurrentCorrect = currentQuestion ? isHskListeningAnswerCorrect(currentQuestion, selectedAnswer) : false;
 
   useEffect(() => {
     if (resumeRestoredRef.current) return;
@@ -374,8 +302,8 @@ export default function HskListeningPage() {
     if (step === 'questions') {
       if (selectedTopic && selectedMode) {
         const progressKey = selectedMode === 'review'
-          ? getSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
-          : getSetProgressKey(selectedLevel, selectedTopic, selectedMode);
+          ? getHskListeningSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
+          : getHskListeningSetProgressKey(selectedLevel, selectedTopic, selectedMode);
         saveSetProgress(progressKey, currentIndex, questions.length);
       }
       setStep(selectedMode === 'review' ? 'review-filter' : 'mode');
@@ -407,7 +335,7 @@ export default function HskListeningPage() {
       setStep('review-filter');
       return;
     }
-    const progressKey = getSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, mode);
+    const progressKey = getHskListeningSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, mode);
     const totalQuestions = mode === 'practice' ? practiceQuestionsForTopic.length : quizQuestionsForTopic.length;
     const savedIndex = Math.min(
       progress.savedSetProgress[progressKey]?.currentIndex ?? 0,
@@ -450,7 +378,7 @@ export default function HskListeningPage() {
       questionId: currentQuestion.id,
       selectedAnswer: currentQuestion.activityType === 'multiple_choice' ? selectedAnswer : undefined,
       typedAnswer: currentQuestion.activityType !== 'multiple_choice' ? selectedAnswer : undefined,
-      correct: isAnswerCorrect(currentQuestion, selectedAnswer),
+      correct: isHskListeningAnswerCorrect(currentQuestion, selectedAnswer),
       playedCount: currentPlayCount,
       solvedAt: new Date().toISOString(),
       durationMs: Date.now() - questionStartRef.current,
@@ -459,7 +387,7 @@ export default function HskListeningPage() {
       contentType: currentQuestion.contentType,
       activityType: currentQuestion.activityType,
       listeningSkill: currentQuestion.listeningSkill,
-      errorTags: isAnswerCorrect(currentQuestion, selectedAnswer)
+      errorTags: isHskListeningAnswerCorrect(currentQuestion, selectedAnswer)
         ? undefined
         : currentQuestion.listeningSkill === 'number_time_listening'
           ? ['number_time_related']
@@ -477,8 +405,8 @@ export default function HskListeningPage() {
     if (currentIndex >= questions.length - 1) {
       if (selectedTopic && selectedMode) {
         const progressKey = selectedMode === 'review'
-          ? getSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
-          : getSetProgressKey(selectedLevel, selectedTopic, selectedMode);
+          ? getHskListeningSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
+          : getHskListeningSetProgressKey(selectedLevel, selectedTopic, selectedMode);
         saveSetProgress(progressKey, questions.length, questions.length);
       }
       setStep('results');
@@ -487,8 +415,8 @@ export default function HskListeningPage() {
     const nextIndex = currentIndex + 1;
     if (selectedTopic && selectedMode) {
       const progressKey = selectedMode === 'review'
-        ? getSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
-        : getSetProgressKey(selectedLevel, selectedTopic, selectedMode);
+        ? getHskListeningSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
+        : getHskListeningSetProgressKey(selectedLevel, selectedTopic, selectedMode);
       saveSetProgress(progressKey, nextIndex, questions.length);
     }
     setCurrentIndex(nextIndex);
@@ -497,8 +425,8 @@ export default function HskListeningPage() {
   const restartSet = () => {
     if (selectedTopic && selectedMode) {
       const progressKey = selectedMode === 'review'
-        ? getSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
-        : getSetProgressKey(selectedLevel, selectedTopic, selectedMode);
+        ? getHskListeningSetProgressKey(selectedLevel, selectedTopic, 'review', reviewFilter ?? undefined)
+        : getHskListeningSetProgressKey(selectedLevel, selectedTopic, selectedMode);
       saveSetProgress(progressKey, 0, questions.length);
     }
     setCurrentIndex(0);
@@ -598,7 +526,7 @@ export default function HskListeningPage() {
             const progressPercent = mode === 'review'
               ? undefined
               : getProgressPercent(
-                progress.savedSetProgress[getSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, mode)]?.currentIndex ?? 0,
+                progress.savedSetProgress[getHskListeningSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, mode)]?.currentIndex ?? 0,
                 totalQuestions,
               );
 
@@ -623,7 +551,7 @@ export default function HskListeningPage() {
           {(Object.keys(HSK_LISTENING_REVIEW_META) as HskListeningReviewFilter[]).map((filter) => {
             const reviewQuestions = reviewQuestionsByFilter[filter];
             const progressPercent = getProgressPercent(
-              progress.savedSetProgress[getSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, 'review', filter)]?.currentIndex ?? 0,
+              progress.savedSetProgress[getHskListeningSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, 'review', filter)]?.currentIndex ?? 0,
               reviewQuestions.length,
             );
 
@@ -636,7 +564,7 @@ export default function HskListeningPage() {
                 setReviewFilter(filter);
                 setCurrentIndex(
                   Math.min(
-                    progress.savedSetProgress[getSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, 'review', filter)]?.currentIndex ?? 0,
+                    progress.savedSetProgress[getHskListeningSetProgressKey(selectedLevel, selectedTopic as HskListeningTopic, 'review', filter)]?.currentIndex ?? 0,
                     Math.max(reviewQuestions.length - 1, 0),
                   ),
                 );

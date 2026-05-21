@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Star, Volume2, X } from 'lucide-react';
 
 import { useUserWords } from '@/hooks/use-user-words';
-import { speakJapanese } from '@/lib/tts';
+import { speakJapaneseKana, speakJapaneseText } from '@/lib/tts';
 import type { JlptKanaItem } from '@/data/jlpt/kana';
 
 type JlptInteractiveTextProps = {
@@ -165,7 +165,11 @@ export function JlptInteractiveText({ text, kanaItems, fallbackLibraryId, classN
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                speakJapanese(activeData.text);
+                if (activeData.item) {
+                  speakJapaneseKana(activeData.item);
+                } else {
+                  speakJapaneseText(activeData.text);
+                }
               }}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white transition-all active:scale-95"
             >

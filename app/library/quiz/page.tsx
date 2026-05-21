@@ -14,8 +14,15 @@ import { speak } from '@/lib/tts';
 import SegmentedSentence from '@/components/SegmentedSentence';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { QuizFeedbackPanel } from '@/components/ui/QuizFeedbackPanel';
-import { clampCount, getProgressPercent } from '@/lib/ui-state';
+import { getProgressPercent } from '@/lib/ui-state';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
+import {
+  getSafeQuizResultStats,
+  shouldPersistQuizProgress,
+  shouldSaveActiveQuizSnapshot,
+  type ActiveQuizState,
+  type SharedQuizState,
+} from '@/features/quiz/session';
 
 type QuestionFormat = 'hanzi-to-meaning' | 'meaning-to-hanzi' | 'sentence-fill' | 'sentence-unscramble-ko' | 'sentence-unscramble-zh';
 
@@ -29,9 +36,8 @@ interface LibraryQuizQuestion {
   shuffledTokens?: string[];
 }
 
-type QuizState = 'answering' | 'feedback' | 'finished';
 type LibraryQuizSnapshot = {
-  quizState: Exclude<QuizState, 'finished'>;
+  quizState: ActiveQuizState;
   selectedOption: string | null;
   userTokens: string[];
   shuffledTokens: string[];
@@ -40,7 +46,7 @@ type LibraryQuizSnapshot = {
 type LibraryQuizResumeSnapshot = {
   questions: LibraryQuizQuestion[];
   currentIndex: number;
-  quizState: Exclude<QuizState, 'finished'>;
+  quizState: ActiveQuizState;
   selectedOption: string | null;
   userTokens: string[];
   shuffledTokens: string[];
@@ -51,15 +57,6 @@ type LibraryQuizResumeSnapshot = {
 
 function shuffleArray<T>(items: T[]) {
   return [...items].sort(() => Math.random() - 0.5);
-}
-
-function getSafeQuizResultStats(score: number, totalQuestions: number) {
-  const displayScore = clampCount(score, totalQuestions);
-  const displayAccuracy = totalQuestions > 0
-    ? Math.round((displayScore / totalQuestions) * 100)
-    : 0;
-
-  return { displayScore, displayAccuracy };
 }
 
 function getWordDistractorPool(word: WordData, preferredWords: WordData[]) {
@@ -88,7 +85,7 @@ export default function LibraryQuizPage() {
 
   const [questions, setQuestions] = useState<LibraryQuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [quizState, setQuizState] = useState<QuizState>('answering');
+  const [quizState, setQuizState] = useState<SharedQuizState>('answering');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [userTokens, setUserTokens] = useState<string[]>([]);
   const [shuffledTokens, setShuffledTokens] = useState<string[]>([]);
@@ -127,7 +124,7 @@ export default function LibraryQuizPage() {
 
   // Save progress
   useEffect(() => {
-    if (quizState !== 'finished' && currentIndex > 0) {
+    if (shouldPersistQuizProgress(quizState, currentIndex)) {
       localStorage.setItem('library-quiz-progress', currentIndex.toString());
     } else if (quizState === 'finished') {
       localStorage.removeItem('library-quiz-progress');
@@ -227,7 +224,7 @@ export default function LibraryQuizPage() {
   const currentSnapshot = questionSnapshots[currentIndex];
 
   useEffect(() => {
-    if (!resumeHydratedRef.current || questions.length === 0 || quizState === 'finished') return;
+    if (!resumeHydratedRef.current || questions.length === 0 || !shouldSaveActiveQuizSnapshot(quizState)) return;
     setResumeTaskSnapshot(resumeRoute, 'Library Quiz', {
       questions,
       currentIndex,

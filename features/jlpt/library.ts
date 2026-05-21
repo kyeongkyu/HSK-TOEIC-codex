@@ -1,6 +1,6 @@
-import type { WordData } from '@/lib/srs';
+﻿import type { WordData } from '@/lib/srs';
 import type { JlptKanaItem } from '@/data/jlpt/kana';
-import type { JlptVocabItem } from '@/data/jlpt/vocab-n5';
+import type { JlptVocabItem } from '@/data/jlpt/types';
 
 export type LibraryWord = WordData & {
   source?: 'hsk' | 'toeic' | 'jlpt-vocab' | 'jlpt-kana';
@@ -16,9 +16,9 @@ export function normalizeJlptVocabForLibrary(word: JlptVocabItem): LibraryWord {
     meaning: word.meaningKo,
     example: word.exampleJa,
     exampleTranslation: word.exampleKo,
-    level: 5,
+    level: word.level === 'N4' ? 4 : 5,
     source: 'jlpt-vocab',
-    speakText: word.kana,
+    speakText: word.wordTtsText ?? word.kana,
     displayStyle: 'kana',
   };
 }
@@ -33,7 +33,8 @@ export function normalizeJlptKanaForLibrary(item: JlptKanaItem): LibraryWord {
     exampleTranslation: item.exampleSentenceKo,
     level: 5,
     source: 'jlpt-kana',
-    speakText: item.kana,
+    speakText: item.exampleTtsText ?? item.kana,
     displayStyle: 'kana',
   };
 }
+

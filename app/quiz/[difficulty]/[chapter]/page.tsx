@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ProgressMeter } from '@/components/ui/ProgressMeter';
 import { QuizFeedbackPanel } from '@/components/ui/QuizFeedbackPanel';
 import { clampCount, getProgressPercent } from '@/lib/ui-state';
+import { getSafeQuizResultStats } from '@/features/quiz/session';
 import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 
 type QuizState = 'answering' | 'feedback' | 'finished';
@@ -71,15 +72,6 @@ function normalizeSavedQuizProgress(
     wrongQueueIds,
     score: clampCount(parsed.score ?? 0, totalQuestions),
   };
-}
-
-function getSafeQuizResultStats(score: number, totalQuestions: number) {
-  const displayScore = clampCount(score, totalQuestions);
-  const displayAccuracy = totalQuestions > 0
-    ? Math.round((displayScore / totalQuestions) * 100)
-    : 0;
-
-  return { displayScore, displayAccuracy };
 }
 
 export default function QuizPage() {

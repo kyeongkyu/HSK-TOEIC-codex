@@ -1,11 +1,12 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { JlptLevel } from '@/data/jlpt/types';
 
 interface SettingsContextType {
   selectedLevel: number | 'all';
   setLevel: (level: number | 'all') => void;
-  selectedJlptLevel: 'N5';
-  setJlptLevel: (level: 'N5') => void;
+  selectedJlptLevel: JlptLevel;
+  setJlptLevel: (level: JlptLevel) => void;
   isDarkMode: boolean;
   themeMode: 'light' | 'dark' | 'black';
   setThemeMode: (mode: 'light' | 'dark' | 'black') => void;
@@ -36,7 +37,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [selectedLevel, setSelectedLevel] = useState<number | 'all'>(1);
-  const [selectedJlptLevel, setSelectedJlptLevel] = useState<'N5'>('N5');
+  const [selectedJlptLevel, setSelectedJlptLevel] = useState<JlptLevel>('N5');
   const [themeMode, setThemeModeState] = useState<'light' | 'dark' | 'black'>('light');
   const [isCarouselView, setIsCarouselView] = useState(false);
   const [hanziWriterMode, setHanziWriterMode] = useState(false);
@@ -59,8 +60,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setSelectedLevel(storedLevel === 'all' ? 'all' : parseInt(storedLevel, 10));
     }
 
-    localStorage.setItem('jlpt_level', 'N5');
-    setSelectedJlptLevel('N5');
+    const storedJlptLevel = localStorage.getItem('jlpt_level');
+    setSelectedJlptLevel(storedJlptLevel === 'N4' ? 'N4' : 'N5');
     
     // Fallback for old isDarkMode and new themeMode
     const storedTheme = localStorage.getItem('hsk_theme_mode');
@@ -126,7 +127,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('hsk_level', String(level));
   };
 
-  const setJlptLevel = (level: 'N5') => {
+  const setJlptLevel = (level: JlptLevel) => {
     setSelectedJlptLevel(level);
     localStorage.setItem('jlpt_level', level);
   };

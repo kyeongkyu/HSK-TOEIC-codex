@@ -7,76 +7,23 @@ import { KanaWriter } from '@/features/jlpt/KanaWriter';
 import { loadJlptKana } from '@/features/data/loaders';
 import { useSettings } from '@/hooks/use-settings';
 import { useUserWords } from '@/hooks/use-user-words';
-import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
+import { consumeResumeTaskFreshStart, getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
 import { readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
-import { speakJapanese } from '@/lib/tts';
+import { speakJapaneseKana, speakJapaneseText } from '@/lib/tts';
 import type { JlptKanaGroup, JlptKanaItem, JlptKanaScript } from '@/data/jlpt/kana';
-
-type KanaView = 'chart' | 'card';
-
-type KanaProgress = {
-  script: JlptKanaScript;
-  view: KanaView;
-  group: JlptKanaGroup | 'all';
-  currentIndex: number;
-  tab?: KanaView | 'cards' | 'quiz';
-};
-
-const JLPT_KANA_PROGRESS_KEY = 'jlpt_kana_progress';
-
-const DEFAULT_PROGRESS: KanaProgress = {
-  script: 'hiragana',
-  view: 'chart',
-  group: 'all',
-  currentIndex: 0,
-};
-
-const groupLabels: Array<{ id: JlptKanaGroup | 'all'; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'basic', label: 'Basic' },
-  { id: 'dakuten', label: 'Dakuten' },
-  { id: 'handakuten', label: 'Handakuten' },
-  { id: 'yoon', label: 'Yoon' },
-  { id: 'small', label: 'Small' },
-  { id: 'special', label: 'Special' },
-];
-
-function getScriptFromSearch(): JlptKanaScript {
-  if (typeof window === 'undefined') return 'hiragana';
-  return new URLSearchParams(window.location.search).get('script') === 'katakana' ? 'katakana' : 'hiragana';
-}
-
-function getRoute(script: JlptKanaScript) {
-  return `/jlpt/kana?script=${script}`;
-}
-
-function getTaskKey(script: JlptKanaScript) {
-  return script === 'katakana' ? 'jlpt-kana-katakana' : 'jlpt-kana-hiragana';
-}
-
-function getLabel(script: JlptKanaScript) {
-  return script === 'katakana' ? 'Katakana' : 'Hiragana';
-}
-
-function getHomeModeIntent(script: JlptKanaScript) {
-  return script === 'katakana' ? 'kana-katakana' : 'kana-hiragana';
-}
-
-function clampIndex(index: number, total: number) {
-  if (total <= 0) return 0;
-  return Math.min(Math.max(index, 0), total - 1);
-}
-
-function normalizeProgress(progress: KanaProgress | null, script: JlptKanaScript): KanaProgress {
-  if (!progress || progress.script !== script) return { ...DEFAULT_PROGRESS, script };
-  const view = progress.view === 'card' || progress.tab === 'cards' ? 'card' : 'chart';
-  return {
-    script,
-    view,
-    group: progress.group ?? 'all',
-    currentIndex: progress.currentIndex ?? 0,
-  };
-}
+import {
+  clampKanaIndex,
+  getKanaHomeModeIntent,
+  getKanaLabel,
+  getKanaRoute,
+  getKanaTaskKey,
+  getScriptFromSearch,
+  JLPT_KANA_PROGRESS_KEY,
+  kanaGroupLabels,
+  normalizeKanaProgress,
+  type KanaProgress,
+  type KanaView,
+} from '@/features/jlpt/kana-session';
 
 export default function JlptKanaPage() {
   const { jlptKanaWriterMode } = useSettings();
@@ -90,10 +37,10 @@ export default function JlptKanaPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const loadScript = (nextScript: JlptKanaScript, preferStoredProgress = true) => {
-    const route = getRoute(nextScript);
+    const route = getKanaRoute(nextScript);
     const stored = preferStoredProgress ? readLocalStorageJson<KanaProgress | null>(JLPT_KANA_PROGRESS_KEY, null) : null;
     const snapshot = preferStoredProgress ? getResumeTaskSnapshot<KanaProgress>(route) : null;
-    const progress = normalizeProgress(snapshot ?? stored, nextScript);
+    const progress = normalizeKanaProgress(snapshot ?? stored, nextScript);
 
     setIsLoaded(false);
     void Promise.all([loadJlptKana(nextScript), loadJlptKana('hiragana'), loadJlptKana('katakana')]).then(([loadedItems, hiraganaItems, katakanaItems]) => {
@@ -101,7 +48,7 @@ export default function JlptKanaPage() {
       setItems(loadedItems);
       setPopupKanaItems([...hiraganaItems, ...katakanaItems]);
       setGroup(progress.group);
-      setCurrentIndex(clampIndex(progress.currentIndex, loadedItems.length));
+      setCurrentIndex(clampKanaIndex(progress.currentIndex, loadedItems.length));
       setView(progress.view);
       setIsLoaded(true);
     });
@@ -109,10 +56,11 @@ export default function JlptKanaPage() {
 
   useEffect(() => {
     const nextScript = getScriptFromSearch();
-    const route = getRoute(nextScript);
-    const stored = readLocalStorageJson<KanaProgress | null>(JLPT_KANA_PROGRESS_KEY, null);
-    const snapshot = getResumeTaskSnapshot<KanaProgress>(route);
-    const progress = normalizeProgress(snapshot ?? stored, nextScript);
+    const route = getKanaRoute(nextScript);
+    const isFreshStart = consumeResumeTaskFreshStart(route, getKanaTaskKey(nextScript));
+    const stored = isFreshStart ? null : readLocalStorageJson<KanaProgress | null>(JLPT_KANA_PROGRESS_KEY, null);
+    const snapshot = isFreshStart ? null : getResumeTaskSnapshot<KanaProgress>(route);
+    const progress = normalizeKanaProgress(snapshot ?? stored, nextScript);
     let isCancelled = false;
 
     void Promise.all([loadJlptKana(nextScript), loadJlptKana('hiragana'), loadJlptKana('katakana')]).then(([loadedItems, hiraganaItems, katakanaItems]) => {
@@ -121,7 +69,7 @@ export default function JlptKanaPage() {
       setItems(loadedItems);
       setPopupKanaItems([...hiraganaItems, ...katakanaItems]);
       setGroup(progress.group);
-      setCurrentIndex(clampIndex(progress.currentIndex, loadedItems.length));
+      setCurrentIndex(clampKanaIndex(progress.currentIndex, loadedItems.length));
       setView(progress.view);
       setIsLoaded(true);
     });
@@ -135,25 +83,25 @@ export default function JlptKanaPage() {
     return group === 'all' ? items : items.filter(item => item.group === group);
   }, [group, items]);
 
-  const currentItem = filteredItems[clampIndex(currentIndex, filteredItems.length)];
+  const currentItem = filteredItems[clampKanaIndex(currentIndex, filteredItems.length)];
   const isCurrentFavorite = currentItem ? Boolean(userWords[currentItem.id]?.isFavorite) : false;
 
   useEffect(() => {
     if (!isLoaded || items.length === 0) return;
-    const route = getRoute(script);
+    const route = getKanaRoute(script);
     const progress: KanaProgress = {
       script,
       view,
       group,
-      currentIndex: clampIndex(currentIndex, filteredItems.length),
+      currentIndex: clampKanaIndex(currentIndex, filteredItems.length),
     };
 
     writeLocalStorageJson(JLPT_KANA_PROGRESS_KEY, progress);
-    setResumeTaskSnapshot(route, getLabel(script), progress, getTaskKey(script));
+    setResumeTaskSnapshot(route, getKanaLabel(script), progress, getKanaTaskKey(script));
   }, [currentIndex, filteredItems.length, group, isLoaded, items.length, script, view]);
 
   const goBackToKanaHome = () => {
-    sessionStorage.setItem('jlpt_home_mode_intent', getHomeModeIntent(script));
+    sessionStorage.setItem('jlpt_home_mode_intent', getKanaHomeModeIntent(script));
     window.location.assign('/');
   };
 
@@ -165,14 +113,14 @@ export default function JlptKanaPage() {
 
   const handleScriptChange = (nextScript: JlptKanaScript) => {
     if (nextScript === script) return;
-    const route = getRoute(nextScript);
+    const route = getKanaRoute(nextScript);
     window.history.replaceState(null, '', route);
     loadScript(nextScript, false);
   };
 
   const openCard = (item: JlptKanaItem) => {
     const index = filteredItems.findIndex(candidate => candidate.id === item.id);
-    setCurrentIndex(clampIndex(index, filteredItems.length));
+    setCurrentIndex(clampKanaIndex(index, filteredItems.length));
     setView('card');
   };
 
@@ -182,14 +130,14 @@ export default function JlptKanaPage() {
       return;
     }
 
-    setCurrentIndex(index => clampIndex(index, filteredItems.length));
+    setCurrentIndex(index => clampKanaIndex(index, filteredItems.length));
     setView('card');
   };
 
   if (!isLoaded) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-white px-6 text-sm font-bold text-gray-500 dark:bg-black dark:text-gray-400">
-        Loading {getLabel(script)}...
+        Loading {getKanaLabel(script)}...
       </div>
     );
   }
@@ -207,7 +155,7 @@ export default function JlptKanaPage() {
         </button>
         <div className="text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">JLPT Kana</p>
-          <h1 className="text-xl font-black">{getLabel(script)}</h1>
+          <h1 className="text-xl font-black">{getKanaLabel(script)}</h1>
         </div>
         <button
           type="button"
@@ -233,13 +181,13 @@ export default function JlptKanaPage() {
                     : 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
                 }`}
               >
-                {getLabel(option)}
+                {getKanaLabel(option)}
               </button>
             ))}
           </div>
 
           <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-            {groupLabels.map(item => (
+            {kanaGroupLabels.map(item => (
               <button
                 key={item.id}
                 type="button"
@@ -306,7 +254,7 @@ export default function JlptKanaPage() {
               {jlptKanaWriterMode ? (
                 <button
                   type="button"
-                  onClick={() => speakJapanese(currentItem.kana)}
+                  onClick={() => speakJapaneseKana(currentItem)}
                   className="mt-4 block w-full rounded-[1.75rem] text-left transition-all active:scale-[0.99]"
                   aria-label="Listen to current kana"
                 >
@@ -316,7 +264,7 @@ export default function JlptKanaPage() {
                 <>
                   <button
                     type="button"
-                    onClick={() => speakJapanese(currentItem.kana)}
+                    onClick={() => speakJapaneseKana(currentItem)}
                     className="mx-auto mt-3 block rounded-[2rem] px-5 py-3 transition-all active:scale-[0.98]"
                     aria-label="Listen to current kana"
                   >
@@ -333,7 +281,7 @@ export default function JlptKanaPage() {
               <span aria-hidden="true" />
               <button
                 type="button"
-                onClick={() => speakJapanese(currentItem.example)}
+                onClick={() => speakJapaneseText(currentItem.exampleTtsText ?? currentItem.example)}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition-all active:scale-95 dark:bg-indigo-950/40 dark:text-indigo-300"
                 aria-label="Listen to example word"
               >
@@ -350,7 +298,7 @@ export default function JlptKanaPage() {
               <span aria-hidden="true" />
               <button
                 type="button"
-                onClick={() => speakJapanese(currentItem.exampleSentenceJa)}
+                onClick={() => speakJapaneseText(currentItem.exampleSentenceTtsText ?? currentItem.exampleSentenceJa)}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition-all active:scale-95 dark:bg-indigo-950/40 dark:text-indigo-300"
                 aria-label="Listen to example sentence"
               >
@@ -367,7 +315,7 @@ export default function JlptKanaPage() {
           <div className="grid grid-cols-[1fr_auto_1fr] gap-3">
             <button
               type="button"
-              onClick={() => setCurrentIndex(index => clampIndex(index - 1, filteredItems.length))}
+              onClick={() => setCurrentIndex(index => clampKanaIndex(index - 1, filteredItems.length))}
               disabled={currentIndex === 0}
               className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 font-black shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-950"
             >
@@ -384,7 +332,7 @@ export default function JlptKanaPage() {
             </button>
             <button
               type="button"
-              onClick={() => setCurrentIndex(index => clampIndex(index + 1, filteredItems.length))}
+              onClick={() => setCurrentIndex(index => clampKanaIndex(index + 1, filteredItems.length))}
               disabled={currentIndex === filteredItems.length - 1}
               className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-black px-4 py-4 font-black text-white shadow-xl shadow-black/20 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
             >

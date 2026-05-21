@@ -3,10 +3,10 @@ import { useUserWords } from '@/hooks/use-user-words';
 import Link from 'next/link';
 import { Star, BookOpen, Brain, CheckSquare } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
-import { speak, speakJapanese } from '@/lib/tts';
+import { speak, speakJapaneseText } from '@/lib/tts';
 import { useSettings } from '@/hooks/use-settings';
 import type { LibraryWord } from '@/features/jlpt/library';
-import { normalizeJlptKanaForLibrary, normalizeJlptVocabForLibrary } from '@/features/jlpt/library';
+import { getFavoriteLibraryWords, loadLibraryWords } from '@/features/library/library-data';
 
 export default function LibraryPage() {
   const { userWords, toggleFavorite, isLoaded } = useUserWords();
@@ -14,44 +14,24 @@ export default function LibraryPage() {
   const [isMemorizeMode, setIsMemorizeMode] = useState(false);
   const [revealedWords, setRevealedWords] = useState<Record<string, boolean>>({});
   const [speakingWordId, setSpeakingWordId] = useState<string | null>(null);
-  const [wordData, setWordData] = useState<LibraryWord[]>([]);
-  const [isWordDataLoaded, setIsWordDataLoaded] = useState(false);
+  const [wordDataState, setWordDataState] = useState<{ mode: string | null; words: LibraryWord[] } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
-    setIsWordDataLoaded(false);
 
-    const loadWords = async () => {
-      let words: LibraryWord[];
-
-      if (appMode === 'toeic') {
-        words = (await import('@/data/toeic')).toeicWords.map(word => ({ ...word, source: 'toeic', displayStyle: 'latin' }));
-      } else if (appMode === 'jlpt') {
-        const [{ jlptN5Vocab }, { jlptHiragana, jlptKatakana }] = await Promise.all([
-          import('@/data/jlpt/vocab-n5'),
-          import('@/data/jlpt/kana'),
-        ]);
-        words = [
-          ...jlptN5Vocab.map(normalizeJlptVocabForLibrary),
-          ...jlptHiragana.map(normalizeJlptKanaForLibrary),
-          ...jlptKatakana.map(normalizeJlptKanaForLibrary),
-        ];
-      } else {
-        words = (await import('@/data/hsk')).hskWords.map(word => ({ ...word, source: 'hsk', displayStyle: 'hanzi' }));
-      }
-
+    void loadLibraryWords(appMode).then((words) => {
       if (!isCancelled) {
-        setWordData(words);
-        setIsWordDataLoaded(true);
+        setWordDataState({ mode: appMode, words });
       }
-    };
-
-    void loadWords();
+    });
 
     return () => {
       isCancelled = true;
     };
   }, [appMode]);
+
+  const wordData = useMemo(() => wordDataState?.mode === appMode ? wordDataState.words : [], [wordDataState, appMode]);
+  const isWordDataLoaded = wordDataState?.mode === appMode;
 
   const toggleReveal = (id: string) => {
     setRevealedWords(prev => ({ ...prev, [id]: !prev[id] }));
@@ -64,7 +44,7 @@ export default function LibraryPage() {
     };
 
     if (appMode === 'jlpt') {
-      speakJapanese(word.speakText ?? word.word, ttsSpeed, handleEnd);
+      speakJapaneseText(word.speakText ?? word.word, ttsSpeed, handleEnd);
       return;
     }
 
@@ -72,14 +52,11 @@ export default function LibraryPage() {
   };
 
   const favoriteWords = useMemo(() => {
-    const favoriteWordIds = new Set(Object.keys(userWords).filter(id => userWords[id]?.isFavorite));
-    let filtered = wordData.filter(w => favoriteWordIds.has(w.id));
-    
-    if (appMode === 'hsk' && separateLibraryByLevel && selectedLevel !== 'all') {
-      filtered = filtered.filter(w => w.level === selectedLevel);
-    }
-    
-    return filtered;
+    return getFavoriteLibraryWords(userWords, wordData, {
+      appMode,
+      separateLibraryByLevel,
+      selectedLevel,
+    });
   }, [userWords, separateLibraryByLevel, selectedLevel, appMode, wordData]);
 
   if (!isLoaded || !isWordDataLoaded) return <div className="min-h-[50vh] p-8 text-center text-gray-500 flex items-center justify-center">Loading...</div>;

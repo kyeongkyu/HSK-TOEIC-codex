@@ -1,4 +1,5 @@
 import type { WordData } from '@/lib/srs';
+import type { JlptLevel } from '@/data/jlpt/types';
 
 export async function loadHskWords(): Promise<WordData[]> {
   return (await import('@/data/hsk')).hskWords;
@@ -20,12 +21,12 @@ export async function loadHskSentenceStudyData() {
   return import('@/data/hsk-sentence-study');
 }
 
-export async function loadJlptVocab(level: 'N5') {
-  if (level === 'N5') {
-    return (await import('@/data/jlpt/vocab-n5')).jlptN5Vocab;
+export async function loadJlptVocab(level: JlptLevel) {
+  if (level === 'N4') {
+    return (await import('@/data/jlpt/vocab-n4')).jlptN4Vocab;
   }
 
-  return [];
+  return (await import('@/data/jlpt/vocab-n5')).jlptN5Vocab;
 }
 
 export async function loadJlptKana(script: 'hiragana' | 'katakana') {

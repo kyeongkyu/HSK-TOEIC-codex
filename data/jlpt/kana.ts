@@ -14,6 +14,9 @@ export type JlptKanaItem = {
   exampleSentenceJa: string;
   exampleSentenceKo: string;
   exampleSentenceRomaji: string;
+  audioKey?: string;
+  exampleTtsText?: string;
+  exampleSentenceTtsText?: string;
 };
 
 type KanaSeed = {
@@ -123,6 +126,9 @@ export const jlptHiragana: JlptKanaItem[] = seeds.map((seed, index) => ({
   exampleSentenceJa: seed.sentenceHiragana,
   exampleSentenceKo: seed.sentenceKoHiragana,
   exampleSentenceRomaji: seed.sentenceRomajiHiragana,
+  audioKey: seed.romaji,
+  exampleTtsText: seed.exampleHiragana,
+  exampleSentenceTtsText: seed.sentenceHiragana,
 }));
 
 export const jlptKatakana: JlptKanaItem[] = seeds.map((seed, index) => ({
@@ -138,6 +144,9 @@ export const jlptKatakana: JlptKanaItem[] = seeds.map((seed, index) => ({
   exampleSentenceJa: seed.sentenceKatakana,
   exampleSentenceKo: seed.sentenceKoKatakana,
   exampleSentenceRomaji: seed.sentenceRomajiKatakana,
+  audioKey: seed.romaji,
+  exampleTtsText: seed.exampleKatakana,
+  exampleSentenceTtsText: seed.sentenceKatakana,
 }));
 
 export function getJlptKana(script: JlptKanaScript) {

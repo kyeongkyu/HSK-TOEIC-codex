@@ -4,21 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, List, Volume2 } from 'lucide-react';
 import { loadJlptVocab } from '@/features/data/loaders';
-import { getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
-import { getProgressPercent, writeLocalStorageJson } from '@/lib/ui-state';
-import { speakJapanese } from '@/lib/tts';
-import type { JlptVocabItem } from '@/data/jlpt/vocab-n5';
+import { consumeResumeTaskFreshStart, getResumeTaskSnapshot, setResumeTaskSnapshot } from '@/lib/resume-task';
+import { getProgressPercent, readLocalStorageJson, writeLocalStorageJson } from '@/lib/ui-state';
+import { speakJapaneseText } from '@/lib/tts';
+import { useSettings } from '@/hooks/use-settings';
+import type { JlptLevel, JlptVocabItem } from '@/data/jlpt/types';
 
 type JlptVocabProgress = {
+  level: JlptLevel;
   currentIndex: number;
   viewMode: 'focus' | 'list';
 };
 
 const JLPT_VOCAB_PROGRESS_KEY = 'jlpt_vocab_progress';
-const DEFAULT_PROGRESS: JlptVocabProgress = {
+const getDefaultProgress = (level: JlptLevel): JlptVocabProgress => ({
+  level,
   currentIndex: 0,
   viewMode: 'focus',
-};
+});
 
 function clampIndex(index: number, total: number) {
   if (total <= 0) return 0;
@@ -27,6 +30,7 @@ function clampIndex(index: number, total: number) {
 
 export default function JlptVocabPage() {
   const router = useRouter();
+  const { selectedJlptLevel } = useSettings();
   const [words, setWords] = useState<JlptVocabItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -35,11 +39,20 @@ export default function JlptVocabPage() {
   useEffect(() => {
     let isCancelled = false;
 
-    void loadJlptVocab('N5').then((loadedWords) => {
+    void loadJlptVocab(selectedJlptLevel).then((loadedWords) => {
       if (isCancelled) return;
 
-      const snapshot = getResumeTaskSnapshot<JlptVocabProgress>('/jlpt/vocab');
-      const progress = snapshot ?? DEFAULT_PROGRESS;
+      const defaultProgress = getDefaultProgress(selectedJlptLevel);
+      const isFreshStart = consumeResumeTaskFreshStart('/jlpt/vocab', 'jlpt-vocab');
+      const snapshot = isFreshStart ? null : getResumeTaskSnapshot<JlptVocabProgress>('/jlpt/vocab');
+      const storedProgress = isFreshStart ? defaultProgress : readLocalStorageJson<JlptVocabProgress>(JLPT_VOCAB_PROGRESS_KEY, defaultProgress);
+      const progress = isFreshStart
+        ? defaultProgress
+        : snapshot?.level === selectedJlptLevel
+          ? snapshot
+          : storedProgress.level === selectedJlptLevel
+            ? storedProgress
+            : defaultProgress;
 
       setWords(loadedWords);
       setCurrentIndex(clampIndex(progress.currentIndex, loadedWords.length));
@@ -50,7 +63,7 @@ export default function JlptVocabPage() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [selectedJlptLevel]);
 
   const currentWord = words[currentIndex];
   const progressPercent = useMemo(() => getProgressPercent(currentIndex + 1, words.length), [currentIndex, words.length]);
@@ -59,18 +72,22 @@ export default function JlptVocabPage() {
     if (!isLoaded || words.length === 0) return;
 
     const progress: JlptVocabProgress = {
+      level: selectedJlptLevel,
       currentIndex: clampIndex(currentIndex, words.length),
       viewMode,
     };
 
     writeLocalStorageJson(JLPT_VOCAB_PROGRESS_KEY, progress);
-    setResumeTaskSnapshot('/jlpt/vocab', 'JLPT N5 Vocabulary', progress, 'jlpt-vocab');
-  }, [currentIndex, isLoaded, viewMode, words.length]);
+    setResumeTaskSnapshot('/jlpt/vocab', `JLPT ${selectedJlptLevel} Vocabulary`, progress, {
+      taskKey: 'jlpt-vocab',
+      levelScope: selectedJlptLevel,
+    });
+  }, [currentIndex, isLoaded, selectedJlptLevel, viewMode, words.length]);
 
   if (!isLoaded) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-white px-6 text-sm font-bold text-gray-500 dark:bg-black dark:text-gray-400">
-        Loading JLPT N5 vocabulary...
+        Loading JLPT {selectedJlptLevel} vocabulary...
       </div>
     );
   }
@@ -82,7 +99,10 @@ export default function JlptVocabPage() {
         <h1 className="text-2xl font-black text-black dark:text-white">No JLPT words yet</h1>
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={() => {
+            sessionStorage.setItem('jlpt_home_mode_intent', selectedJlptLevel === 'N4' ? 'vocab-n4' : 'vocab-n5');
+            router.push('/');
+          }}
           className="rounded-2xl bg-black px-5 py-3 text-sm font-black text-white dark:bg-white dark:text-black"
         >
           Back Home
@@ -96,14 +116,17 @@ export default function JlptVocabPage() {
       <header className="mb-4 flex items-center justify-between">
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={() => {
+            sessionStorage.setItem('jlpt_home_mode_intent', selectedJlptLevel === 'N4' ? 'vocab-n4' : 'vocab-n5');
+            router.push('/');
+          }}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm transition-all active:scale-95 dark:border-gray-800 dark:bg-gray-950"
           aria-label="Back to JLPT home"
         >
           <ArrowLeft size={22} />
         </button>
         <div className="text-center">
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">JLPT N5</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">JLPT {selectedJlptLevel}</p>
           <h1 className="text-xl font-black">Vocabulary</h1>
         </div>
         <button
@@ -134,11 +157,20 @@ export default function JlptVocabPage() {
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">{currentWord.partOfSpeech}</p>
                 <h2 className="mt-2 break-keep text-5xl font-black leading-none tracking-tight">{currentWord.word}</h2>
                 <p className="mt-2 text-2xl font-black text-indigo-700 dark:text-indigo-300">{currentWord.kana}</p>
-                <p className="mt-1 text-sm font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{currentWord.romaji}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-bold tracking-[0.08em] text-gray-500 dark:text-gray-400">{currentWord.romaji}</p>
+                  <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest ${
+                    currentWord.priority === 'essential'
+                      ? 'bg-black text-white dark:bg-white dark:text-black'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300'
+                  }`}>
+                    {currentWord.priority}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => speakJapanese(currentWord.kana)}
+                onClick={() => speakJapaneseText(currentWord.wordTtsText ?? currentWord.kana)}
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 p-3 text-white shadow-xl shadow-indigo-700/20 transition-all active:scale-95"
                 aria-label="Listen to Japanese word"
               >
@@ -157,13 +189,14 @@ export default function JlptVocabPage() {
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Example</p>
               <button
                 type="button"
-                onClick={() => speakJapanese(currentWord.exampleJa)}
+                onClick={() => speakJapaneseText(currentWord.exampleTtsText ?? currentWord.exampleJa)}
                 className="rounded-xl bg-gray-100 px-3 py-2 text-gray-700 transition-all active:scale-95 dark:bg-gray-900 dark:text-gray-300"
               >
                 <Volume2 size={18} />
               </button>
             </div>
             <p className="break-keep text-2xl font-black leading-relaxed">{currentWord.exampleJa}</p>
+            <p className="mt-2 text-sm font-black lowercase tracking-[0.08em] text-indigo-700 dark:text-indigo-300">{currentWord.exampleRomaji}</p>
             <p className="mt-3 break-keep text-sm font-bold leading-relaxed text-gray-500 dark:text-gray-400">{currentWord.exampleKo}</p>
           </section>
         </main>
@@ -188,7 +221,14 @@ export default function JlptVocabPage() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xl font-black">{word.word}</span>
-                <span className="mt-1 block truncate text-sm font-bold text-gray-500 dark:text-gray-400">{word.kana} · {word.meaningKo}</span>
+                <span className="mt-1 block truncate text-sm font-bold text-gray-500 dark:text-gray-400">{word.kana} · {word.romaji} · {word.meaningKo}</span>
+                <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest ${
+                  word.priority === 'essential'
+                    ? 'bg-black text-white dark:bg-white dark:text-black'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300'
+                }`}>
+                  {word.priority}
+                </span>
               </span>
             </button>
           ))}

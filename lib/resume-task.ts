@@ -23,7 +23,7 @@ export type ResumeTaskMeta = {
   label: string;
   route: string;
   updatedAt: number;
-  levelScope?: number | 'all';
+  levelScope?: number | 'all' | 'N5' | 'N4';
 };
 type ResumeTaskDefinition = Omit<ResumeTaskMeta, 'updatedAt'> & {
   matchesRoute: (baseRoute: string) => boolean;
@@ -42,7 +42,7 @@ const RESUME_TASK_DEFINITIONS: ResumeTaskDefinition[] = [
   { taskKey: 'hsk-listening', appMode: 'hsk', label: 'Listening', route: '/hsk-listening', matchesRoute: route => route === '/hsk-listening' },
   { taskKey: 'hsk-grammar', appMode: 'hsk', label: 'Grammar', route: '/grammar', matchesRoute: route => route === '/grammar' },
   { taskKey: 'hsk-library-quiz', appMode: 'hsk', label: 'Library Quiz', route: '/library/quiz', matchesRoute: route => route === '/library/quiz' },
-  { taskKey: 'jlpt-vocab', appMode: 'jlpt', label: 'JLPT N5 Vocabulary', route: '/jlpt/vocab', matchesRoute: route => route === '/jlpt/vocab' },
+  { taskKey: 'jlpt-vocab', appMode: 'jlpt', label: 'JLPT Vocabulary', route: '/jlpt/vocab', matchesRoute: route => route === '/jlpt/vocab' },
   { taskKey: 'jlpt-kana-hiragana', appMode: 'jlpt', label: 'Hiragana', route: '/jlpt/kana?script=hiragana', matchesRoute: route => route === '/jlpt/kana?script=hiragana' },
   { taskKey: 'jlpt-kana-katakana', appMode: 'jlpt', label: 'Katakana', route: '/jlpt/kana?script=katakana', matchesRoute: route => route === '/jlpt/kana?script=katakana' },
   { taskKey: 'toeic-vocab', appMode: 'toeic', label: 'TOEIC Vocabulary', route: '/', matchesRoute: route => route === '/' },
@@ -95,9 +95,22 @@ function shouldSkipResume(route: string) {
   return matches;
 }
 
+export function consumeResumeTaskFreshStart(route: string, taskKey?: ResumeTaskKey) {
+  if (typeof window === 'undefined') return false;
+  const skipRoute = sessionStorage.getItem(RESUME_TASK_SKIP_KEY);
+  if (!skipRoute) return false;
+
+  const inferredTaskKey = taskKey ?? inferTaskKey(route);
+  const matches = skipRoute === route || skipRoute === getBaseRoute(route) || Boolean(inferredTaskKey && skipRoute === inferredTaskKey);
+  if (matches) {
+    sessionStorage.removeItem(RESUME_TASK_SKIP_KEY);
+  }
+  return matches;
+}
+
 type ResumeTaskOptions = {
   taskKey?: ResumeTaskKey;
-  levelScope?: number | 'all';
+  levelScope?: number | 'all' | 'N5' | 'N4';
 };
 
 export function setResumeTaskSnapshot(route: string, label: string, snapshot: unknown, taskKeyOrOptions?: ResumeTaskKey | ResumeTaskOptions) {
